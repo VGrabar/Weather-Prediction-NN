@@ -1,0 +1,18 @@
+_target_: src.datamodules.weather_datamodule.WeatherDataModule
+
+data_dir: ${data_dir}  # data_dir is specified in config.yaml
+dataset_name: ${dataset_name}  # dataset_name is specified in config.yaml
+n_cells_hor: 39
+n_cells_ver: 90
+left_border: 0
+down_border: 0
+right_border: 200
+up_border: 250
+time_col: "time"
+event_col: "value"
+valid_periods: 365
+test_periods: 365
+periods_to_predict: 1
+batch_size: 1
+num_workers: 0
+pin_memory: False
