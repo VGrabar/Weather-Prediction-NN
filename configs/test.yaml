@@ -3,8 +3,8 @@
 # specify here default evaluation configuration
 defaults:
   - _self_
-  - datamodule: wea.yaml # choose the datamodule for evaluation
-  - model: mnist.yaml
+  - datamodule: weather.yaml # choose the datamodule for evaluation
+  - model: rcnn.yaml
   - callbacks: null
   - logger: null
   - trainer: default.yaml

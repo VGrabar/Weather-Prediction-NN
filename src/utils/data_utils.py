@@ -19,18 +19,20 @@ def create_celled_data(
     right_border: int = 2000,
     up_border: int = 2500,
     time_col: str = "time",
-    event_col: str = "value",
+    event_col: str = "val",
+    x_col: str = "x",
+    y_col: str = "y",
 ):
 
     data_path = pathlib.Path(
             data_path,
-            dataset_name,
-            "_" + str(n_cells_hor) + "x" + str(n_cells_ver),
+            dataset_name +
+            "_" + str(n_cells_hor) + "x" + str(n_cells_ver) + ".csv",
         )
 
     df = pd.read_csv(data_path)
     df.sort_values(by=[time_col], inplace=True)
-    df = df[[event_col, "x", "y", time_col]]
+    df = df[[event_col, x_col, y_col, time_col]]
     
     indicies = range(df.shape[0])
     start_date = int(df[time_col][indicies[0]])
@@ -44,14 +46,14 @@ def create_celled_data(
 
     for i in tqdm.tqdm(indicies):
         if (
-            (df["x"][i] > left_border)
-            and (df["x"][i] < right_border)
-            and (df["y"][i] > down_border)
-            and (df["y"][i] < up_border)
+            (df[x_col][i] > left_border)
+            and (df[x_col][i] < right_border)
+            and (df[y_col][i] > down_border)
+            and (df[y_col][i] < up_border)
         ):
 
-            x = int(df["x"][i] / cell_size_hor)
-            y = int(df["y"][i] / cell_size_ver)
+            x = int(df[x_col][i] / cell_size_hor)
+            y = int(df[y_col][i] / cell_size_ver)
             celled_data[int(df[time_col][i]) - start_date, 0, x, y] = df[event_col][
                 i
             ]

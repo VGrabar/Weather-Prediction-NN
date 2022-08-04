@@ -47,7 +47,7 @@ def train(config: DictConfig) -> Optional[float]:
     log.info(f"Instantiating model <{config.model._target_}>")
     config.model.n_cells_hor = config.datamodule.n_cells_hor
     config.model.n_cells_ver = config.datamodule.n_cells_ver
-    config.model.n_cells_batch_size = config.datamodule.batch_size
+    config.model.batch_size = config.datamodule.batch_size
     model: LightningModule = hydra.utils.instantiate(config.model)
 
     # Init lightning callbacks

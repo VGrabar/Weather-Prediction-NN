@@ -5,5 +5,5 @@ hidden_state_size: 32
 n_cells_hor: 200
 n_cells_ver: 250
 batch_size: 1
-lr: 0.001
-weight_decay: 0.0005
+lr: 0.003
+weight_decay: 0

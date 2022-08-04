@@ -8,10 +8,12 @@ left_border: 0
 down_border: 0
 right_border: 200
 up_border: 250
-time_col: "time"
-event_col: "value"
-valid_periods: 365
-test_periods: 365
+time_col: "date"
+event_col: "val"
+x_col: "x"
+y_col: "y"
+valid_periods: 60
+test_periods: 60
 periods_to_predict: 1
 batch_size: 1
 num_workers: 0

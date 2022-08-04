@@ -5,7 +5,7 @@ import torch
 from pytorch_lightning import LightningDataModule
 from torch.utils.data import DataLoader, Dataset
 
-from utils.data_utils import create_celled_data
+from src.utils.data_utils import create_celled_data
 
 
 class Dataset_RNN(Dataset):
@@ -26,7 +26,7 @@ class Dataset_RNN(Dataset):
     def __getitem__(self, idx):
         return (
             self.data[idx],
-            self.data[(idx) : (idx + self.periods_to_predict)],
+            self.data[idx + 1 : idx + 1 + self.periods_to_predict],
         )
 
 
@@ -59,6 +59,8 @@ class WeatherDataModule(LightningDataModule):
         up_border: int = 2500,
         time_col: str = "time",
         event_col: str = "value",
+        x_col: str = "x",
+        y_col: str = "y",
         valid_periods: int = 365,
         test_periods: int = 365,
         periods_to_predict: int = 1,
@@ -80,6 +82,8 @@ class WeatherDataModule(LightningDataModule):
         self.up_border = up_border
         self.time_col = time_col
         self.event_col = event_col
+        self.x_col = x_col
+        self.y_col = y_col
 
         self.data_train: Optional[Dataset] = None
         self.data_val: Optional[Dataset] = None
@@ -101,12 +105,15 @@ class WeatherDataModule(LightningDataModule):
         celled_data_path = pathlib.Path(
             self.data_dir,
             "celled",
-            self.dataset_name,
-            "_" + str(self.n_cells_hor) + "x" + str(self.n_cells_ver),
+            self.dataset_name
+            + "_"
+            + str(self.n_cells_hor)
+            + "x"
+            + str(self.n_cells_ver),
         )
         if not celled_data_path.is_file():
             celled_data = create_celled_data(
-                self.data_path,
+                self.data_dir,
                 self.dataset_name,
                 self.n_cells_hor,
                 self.n_cells_ver,
@@ -116,6 +123,8 @@ class WeatherDataModule(LightningDataModule):
                 self.up_border,
                 self.time_col,
                 self.event_col,
+                self.x_col,
+                self.y_col,
             )
             torch.save(celled_data, celled_data_path)
 
@@ -132,8 +141,11 @@ class WeatherDataModule(LightningDataModule):
             celled_data_path = pathlib.Path(
                 self.data_dir,
                 "celled",
-                self.dataset_name,
-                "_" + str(self.n_cells_hor) + "x" + str(self.n_cells_ver),
+                self.dataset_name
+                + "_"
+                + str(self.n_cells_hor)
+                + "x"
+                + str(self.n_cells_ver),
             )
             celled_data = torch.load(celled_data_path)
             train_start = 0

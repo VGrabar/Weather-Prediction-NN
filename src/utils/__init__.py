@@ -7,7 +7,6 @@ import rich.syntax
 import rich.tree
 from omegaconf import DictConfig, OmegaConf
 from pytorch_lightning.utilities import rank_zero_only
-from .data_utils import load_data, load_data_seq
 
 
 def get_logger(name=__name__) -> logging.Logger:

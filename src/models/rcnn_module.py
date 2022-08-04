@@ -30,6 +30,8 @@ class RCNNModule(LightningModule):
         n_cells_hor: int = 200,
         n_cells_ver: int = 250,
         batch_size: int = 1,
+        lr: float = 0.003,
+        weight_decay: float = 0.0,
     ):
         super(self.__class__, self).__init__()
 
@@ -40,6 +42,8 @@ class RCNNModule(LightningModule):
         self.n_cells_hor = n_cells_hor
         self.n_cells_ver = n_cells_ver
         self.batch_size = batch_size
+        self.lr = lr
+        self.weight_decay = weight_decay
 
         self.emb_size = embedding_size
         self.hid_size = hidden_state_size
@@ -80,31 +84,33 @@ class RCNNModule(LightningModule):
             nn.Conv2d(self.hid_size, 1, kernel_size=1, stride=1, padding=0, bias=False),
         )
 
-        self.prev_state = (
-            Variable(
-                torch.zeros(
-                    self.batch_size, self.hid_size, self.n_cells_hor, self.n_cells_ver
-                )
-            ),
-            Variable(
-                torch.zeros(
-                    batch_size, self.hid_size, self.n_cells_hor, self.n_cells_ver
-                )
-            ),
-        )
+        self.register_buffer("prev_state_h", torch.zeros(
+                self.batch_size,
+                self.hid_size,
+                self.n_cells_hor,
+                self.n_cells_ver,
+                requires_grad=False
+            ))
+        self.register_buffer("prev_state_c", torch.zeros(
+                self.batch_size,
+                self.hid_size,
+                self.n_cells_hor,
+                self.n_cells_ver,
+                requires_grad=False
+            ))
 
         # use separate metric instance for train, val and test step
         # to ensure a proper reduction over the epoch
-        self.train_metric = rsquared()
-        self.val_metric = rsquared()
-        self.test_metric = rsquared()
-
+        self.train_metric = rsquared
+        self.val_metric = rsquared
+        self.test_metric = rsquared
 
         # loss
         self.criterion = nn.MSELoss()
 
-    def forward(self, x: torch.Tensor, prev_state: Tuple[torch.Tensor]):
-        (prev_c, prev_h) = prev_state
+    def forward(self, x: torch.Tensor):
+        prev_c = self.prev_state_c
+        prev_h = self.prev_state_h
         x_emb = self.embedding(x)
         x_and_h = torch.cat([prev_h, x_emb], dim=1)
 
@@ -120,15 +126,20 @@ class RCNNModule(LightningModule):
         assert prev_c.shape == next_c.shape
 
         prediction = self.final_conv(next_h)
+        self.prev_state_c = next_c
+        self.prev_state_h = next_h
 
-        return (next_c, next_h), prediction
-
+        return prediction
 
     def step(self, batch: Any):
         x, y = batch
-        self.prev_state, preds = self.forward(x, self.prev_state)
+        preds = self.forward(x)
         loss = self.criterion(preds, y)
         return loss, preds, y
+
+    def on_after_backward(self) -> None:
+        self.prev_state_c.detach_()
+        self.prev_state_h.detach_()
 
     def training_step(self, batch: Any, batch_idx: int):
         loss, preds, targets = self.step(batch)
@@ -153,7 +164,7 @@ class RCNNModule(LightningModule):
         # log val metrics
         val_metric = self.val_metric(preds, targets)
         self.log("val/loss", loss, on_step=False, on_epoch=True, prog_bar=True)
-        self.log("val/acc", val_metric, on_step=False, on_epoch=True, prog_bar=True)
+        self.log("val/R2", val_metric, on_step=False, on_epoch=True, prog_bar=True)
 
         return {"loss": loss, "preds": preds, "targets": targets}
 
@@ -164,9 +175,9 @@ class RCNNModule(LightningModule):
         loss, preds, targets = self.step(batch)
 
         # log test metrics
-        test_metric= self.test_metric(preds, targets)
+        test_metric = self.test_metric(preds, targets)
         self.log("test/loss", loss, on_step=False, on_epoch=True)
-        self.log("test/acc", test_metric, on_step=False, on_epoch=True)
+        self.log("test/R2", test_metric, on_step=False, on_epoch=True)
 
         return {"loss": loss, "preds": preds, "targets": targets}
 

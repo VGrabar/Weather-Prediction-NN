@@ -5,7 +5,7 @@ defaults:
   - _self_
   - datamodule: weather.yaml
   - model: rcnn.yaml
-  - callbacks: default.yaml
+  - callbacks: null # default.yaml
   - logger: null # set logger here or use command line (e.g. `python train.py logger=tensorboard`)
   - trainer: default.yaml
   - log_dir: default.yaml
@@ -18,7 +18,7 @@ defaults:
   - debug: null
 
   # config for hyperparameter optimization
-  - hparams_search: null
+  - hparams_search: null # optuna.yaml
 
   # optional local config for machine/user specific settings
   # it's optional since it doesn't need to exist and is excluded from version control
