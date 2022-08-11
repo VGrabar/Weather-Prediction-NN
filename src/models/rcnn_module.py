@@ -143,11 +143,7 @@ class RCNNModule(LightningModule):
 
     def training_step(self, batch: Any, batch_idx: int):
         loss, preds, targets = self.step(batch)
-
-        # log train metrics
-        train_metric = self.train_metric(preds, targets)
-        self.log("train/loss", loss, on_step=False, on_epoch=True, prog_bar=True)
-        self.log("train/R2", train_metric, on_step=False, on_epoch=True, prog_bar=True)
+        self.log("train/loss", loss, on_step=True, on_epoch=True, prog_bar=True)
 
         # we can return here dict with any tensors
         # and then read it in some callback or in `training_epoch_end()`` below
@@ -156,33 +152,53 @@ class RCNNModule(LightningModule):
 
     def training_epoch_end(self, outputs: List[Any]):
         # `outputs` is a list of dicts returned from `training_step()`
+        all_preds = outputs[0]["preds"]
+        all_targets = outputs[0]["targets"]
+        
+        for i in range(1, len(outputs)):
+            all_preds = torch.cat((all_preds, outputs[i]["preds"]), 0)            
+            all_targets = torch.cat((all_targets, outputs[i]["preds"]), 0)            
+        
+        # log metrics
+        train_metric = self.train_metric(all_preds, all_targets)
+        self.log("train/R2", train_metric, on_epoch=True, prog_bar=True)
         pass
 
     def validation_step(self, batch: Any, batch_idx: int):
         loss, preds, targets = self.step(batch)
-
-        # log val metrics
-        val_metric = self.val_metric(preds, targets)
-        self.log("val/loss", loss, on_step=False, on_epoch=True, prog_bar=True)
-        self.log("val/R2", val_metric, on_step=False, on_epoch=True, prog_bar=True)
+        self.log("val/loss", loss, on_step=True, on_epoch=True, prog_bar=True)
 
         return {"loss": loss, "preds": preds, "targets": targets}
 
     def validation_epoch_end(self, outputs: List[Any]):
-        pass
+        all_preds = outputs[0]["preds"]
+        all_targets = outputs[0]["targets"]
+        
+        for i in range(1, len(outputs)):
+            all_preds = torch.cat((all_preds, outputs[i]["preds"]), 0)            
+            all_targets = torch.cat((all_targets, outputs[i]["preds"]), 0)            
+        
+        # log metrics
+        val_metric = self.val_metric(all_preds, all_targets)
+        self.log("val/R2", val_metric, on_epoch=True, prog_bar=True)
 
     def test_step(self, batch: Any, batch_idx: int):
         loss, preds, targets = self.step(batch)
-
-        # log test metrics
-        test_metric = self.test_metric(preds, targets)
-        self.log("test/loss", loss, on_step=False, on_epoch=True)
-        self.log("test/R2", test_metric, on_step=False, on_epoch=True)
+        self.log("test/loss", loss, on_step=True, on_epoch=True, prog_bar=True)
 
         return {"loss": loss, "preds": preds, "targets": targets}
 
     def test_epoch_end(self, outputs: List[Any]):
-        pass
+        all_preds = outputs[0]["preds"]
+        all_targets = outputs[0]["targets"]
+        
+        for i in range(1, len(outputs)):
+            all_preds = torch.cat((all_preds, outputs[i]["preds"]), 0)            
+            all_targets = torch.cat((all_targets, outputs[i]["preds"]), 0)            
+        
+        # log metrics
+        test_metric = self.test_metric(all_preds, all_targets)
+        self.log("test/R2", test_metric, on_epoch=True, prog_bar=True)
 
     def on_epoch_end(self):
         pass

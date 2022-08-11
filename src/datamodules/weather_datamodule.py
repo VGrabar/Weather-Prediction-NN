@@ -14,11 +14,11 @@ class Dataset_RNN(Dataset):
         celled_data,
         start_date,
         end_date,
-        periods_to_predict,
+        periods_forward,
     ):
-        self.data = celled_data[start_date:end_date]
+        self.data = celled_data[start_date:(end_date - periods_forward)]
         self.size = self.data.shape[0]
-        self.periods_to_predict = periods_to_predict
+        self.periods_forward = periods_forward
 
     def __len__(self):
         return self.size
@@ -26,7 +26,7 @@ class Dataset_RNN(Dataset):
     def __getitem__(self, idx):
         return (
             self.data[idx],
-            self.data[idx + 1 : idx + 1 + self.periods_to_predict],
+            self.data[idx + self.periods_forward],
         )
 
 
@@ -63,7 +63,7 @@ class WeatherDataModule(LightningDataModule):
         y_col: str = "y",
         valid_periods: int = 365,
         test_periods: int = 365,
-        periods_to_predict: int = 1,
+        periods_forward: int = 1,
         batch_size: int = 64,
         num_workers: int = 0,
         pin_memory: bool = False,
@@ -90,7 +90,7 @@ class WeatherDataModule(LightningDataModule):
         self.data_test: Optional[Dataset] = None
         self.valid_periods = valid_periods
         self.test_periods = test_periods
-        self.periods_to_predict = periods_to_predict
+        self.periods_forward = periods_forward
 
         self.batch_size = batch_size
         self.num_workers = num_workers
@@ -151,17 +151,17 @@ class WeatherDataModule(LightningDataModule):
             train_start = 0
             train_end = celled_data.shape[0] - self.valid_periods - self.test_periods
             self.data_train = Dataset_RNN(
-                celled_data, train_start, train_end, self.periods_to_predict
+                celled_data, train_start, train_end, self.periods_forward
             )
             valid_start = celled_data.shape[0] - self.valid_periods - self.test_periods
             valid_end = celled_data.shape[0] - self.test_periods
             self.data_val = Dataset_RNN(
-                celled_data, valid_start, valid_end, self.periods_to_predict
+                celled_data, valid_start, valid_end, self.periods_forward
             )
             test_start = celled_data.shape[0] - self.test_periods
             test_end = celled_data.shape[0]
             self.data_test = Dataset_RNN(
-                celled_data, test_start, test_end, self.periods_to_predict
+                celled_data, test_start, test_end, self.periods_forward
             )
 
     def train_dataloader(self):

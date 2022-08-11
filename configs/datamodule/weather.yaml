@@ -14,7 +14,7 @@ x_col: "x"
 y_col: "y"
 valid_periods: 60
 test_periods: 60
-periods_to_predict: 1
-batch_size: 1
+periods_forward: 1
+batch_size: 4
 num_workers: 0
 pin_memory: False
