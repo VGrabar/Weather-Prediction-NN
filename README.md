@@ -1,4 +1,4 @@
-# LSTM - CNN model for Weather Forecasting
+# ConvLSTM model for Weather Forecasting
 
 PyTorch Lightning implementation of weather forecasting model, partly inspired by the paper ["Recurrent Convolutional Neural Networks help to predict location of Earthquakes"](https://arxiv.org/abs/2004.09140).  
 
@@ -8,4 +8,6 @@ To train model - first, change configs of datamodule and network (if necessary) 
 ```
 python train.py --config==train.yaml
 ```
+
+Experiments results can be tracked via Comet ML 
 
