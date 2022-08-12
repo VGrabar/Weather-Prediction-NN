@@ -8,7 +8,6 @@ import torch
 import tqdm
 
 
-
 def create_celled_data(
     data_path,
     dataset_name,
@@ -25,15 +24,14 @@ def create_celled_data(
 ):
 
     data_path = pathlib.Path(
-            data_path,
-            dataset_name +
-            "_" + str(n_cells_hor) + "x" + str(n_cells_ver) + ".csv",
-        )
+        data_path,
+        dataset_name + ".csv",
+    )
 
     df = pd.read_csv(data_path)
     df.sort_values(by=[time_col], inplace=True)
     df = df[[event_col, x_col, y_col, time_col]]
-    
+
     indicies = range(df.shape[0])
     start_date = int(df[time_col][indicies[0]])
     finish_date = int(df[time_col][indicies[-1]])
@@ -54,8 +52,6 @@ def create_celled_data(
 
             x = int(df[x_col][i] / cell_size_hor)
             y = int(df[y_col][i] / cell_size_ver)
-            celled_data[int(df[time_col][i]) - start_date, 0, x, y] = df[event_col][
-                i
-            ]
-    
+            celled_data[int(df[time_col][i]) - start_date, 0, x, y] = df[event_col][i]
+
     return celled_data

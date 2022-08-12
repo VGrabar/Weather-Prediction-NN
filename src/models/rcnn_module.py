@@ -1,5 +1,6 @@
 from typing import Any, List, Tuple
 
+import numpy as np
 import torch
 import torch.nn as nn
 from pytorch_lightning import LightningModule
@@ -7,6 +8,7 @@ from torch.autograd import Variable
 
 from src.models.components.conv_block import ConvBlock
 from src.utils.metrics import rmse, rsquared, smape
+from src.utils.plotting import make_confusion_matrix, make_pred_vs_target_plot
 
 
 class RCNNModule(LightningModule):
@@ -84,20 +86,26 @@ class RCNNModule(LightningModule):
             nn.Conv2d(self.hid_size, 1, kernel_size=1, stride=1, padding=0, bias=False),
         )
 
-        self.register_buffer("prev_state_h", torch.zeros(
+        self.register_buffer(
+            "prev_state_h",
+            torch.zeros(
                 self.batch_size,
                 self.hid_size,
                 self.n_cells_hor,
                 self.n_cells_ver,
-                requires_grad=False
-            ))
-        self.register_buffer("prev_state_c", torch.zeros(
+                requires_grad=False,
+            ),
+        )
+        self.register_buffer(
+            "prev_state_c",
+            torch.zeros(
                 self.batch_size,
                 self.hid_size,
                 self.n_cells_hor,
                 self.n_cells_ver,
-                requires_grad=False
-            ))
+                requires_grad=False,
+            ),
+        )
 
         # use separate metric instance for train, val and test step
         # to ensure a proper reduction over the epoch
@@ -143,7 +151,7 @@ class RCNNModule(LightningModule):
 
     def training_step(self, batch: Any, batch_idx: int):
         loss, preds, targets = self.step(batch)
-        self.log("train/loss", loss, on_step=True, on_epoch=True, prog_bar=True)
+        self.log("train/loss", loss, on_step=False, on_epoch=True, prog_bar=True)
 
         # we can return here dict with any tensors
         # and then read it in some callback or in `training_epoch_end()`` below
@@ -154,11 +162,11 @@ class RCNNModule(LightningModule):
         # `outputs` is a list of dicts returned from `training_step()`
         all_preds = outputs[0]["preds"]
         all_targets = outputs[0]["targets"]
-        
+
         for i in range(1, len(outputs)):
-            all_preds = torch.cat((all_preds, outputs[i]["preds"]), 0)            
-            all_targets = torch.cat((all_targets, outputs[i]["preds"]), 0)            
-        
+            all_preds = torch.cat((all_preds, outputs[i]["preds"]), 0)
+            all_targets = torch.cat((all_targets, outputs[i]["preds"]), 0)
+
         # log metrics
         train_metric = self.train_metric(all_preds, all_targets)
         self.log("train/R2", train_metric, on_epoch=True, prog_bar=True)
@@ -166,39 +174,67 @@ class RCNNModule(LightningModule):
 
     def validation_step(self, batch: Any, batch_idx: int):
         loss, preds, targets = self.step(batch)
-        self.log("val/loss", loss, on_step=True, on_epoch=True, prog_bar=True)
+        self.log("val/loss", loss, on_step=False, on_epoch=True, prog_bar=True)
 
         return {"loss": loss, "preds": preds, "targets": targets}
 
     def validation_epoch_end(self, outputs: List[Any]):
         all_preds = outputs[0]["preds"]
         all_targets = outputs[0]["targets"]
-        
+
         for i in range(1, len(outputs)):
-            all_preds = torch.cat((all_preds, outputs[i]["preds"]), 0)            
-            all_targets = torch.cat((all_targets, outputs[i]["preds"]), 0)            
-        
+            all_preds = torch.cat((all_preds, outputs[i]["preds"]), 0)
+            all_targets = torch.cat((all_targets, outputs[i]["preds"]), 0)
+
         # log metrics
         val_metric = self.val_metric(all_preds, all_targets)
         self.log("val/R2", val_metric, on_epoch=True, prog_bar=True)
 
     def test_step(self, batch: Any, batch_idx: int):
         loss, preds, targets = self.step(batch)
-        self.log("test/loss", loss, on_step=True, on_epoch=True, prog_bar=True)
+        self.log("test/loss", loss, on_step=False, on_epoch=True, prog_bar=True)
 
         return {"loss": loss, "preds": preds, "targets": targets}
 
     def test_epoch_end(self, outputs: List[Any]):
         all_preds = outputs[0]["preds"]
         all_targets = outputs[0]["targets"]
-        
+
         for i in range(1, len(outputs)):
-            all_preds = torch.cat((all_preds, outputs[i]["preds"]), 0)            
-            all_targets = torch.cat((all_targets, outputs[i]["preds"]), 0)            
-        
+            all_preds = torch.cat((all_preds, outputs[i]["preds"]), 0)
+            all_targets = torch.cat((all_targets, outputs[i]["preds"]), 0)
+
         # log metrics
         test_metric = self.test_metric(all_preds, all_targets)
         self.log("test/R2", test_metric, on_epoch=True, prog_bar=True)
+
+        # log table
+        r2table = np.zeros((all_preds.shape[2], all_preds.shape[3]))
+        for x in range(all_preds.shape[2]):
+            for y in range(all_preds.shape[3]):
+                r2table[x][y] = self.test_metric(
+                    all_preds[:, 0, x, y], all_targets[:, 0, x, y]
+                )
+
+        self.log("test/R2_std", np.std(r2table), on_epoch=True, prog_bar=True)
+        self.log("test/R2_mean", np.mean(r2table), on_epoch=True, prog_bar=True)
+        self.log("test/R2_min", np.min(r2table), on_epoch=True, prog_bar=True)
+        self.log("test/R2_max", np.max(r2table), on_epoch=True, prog_bar=True)
+
+        # log plots
+        image_name = "preds_targets.png"
+        make_pred_vs_target_plot(
+            all_preds,
+            all_targets,
+            title="Forecasting",
+            size=(8, 6),
+            xlabel="periods",
+            xlabel_rotate=45,
+            ylabel="Value",
+            ylabel_rotate=0,
+            filename=image_name,
+        )
+        # self.logger.experiment.add_image("img", image_name, 0)
 
     def on_epoch_end(self):
         pass

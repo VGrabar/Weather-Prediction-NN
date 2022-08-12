@@ -35,7 +35,8 @@ original_work_dir: ${hydra:runtime.cwd}
 
 # path to folder with data
 data_dir: ${original_work_dir}/data/
-dataset_name: "pdsi_belgorod_60y"
+dataset_name: "gtk_20y" 
+num_epochs: 5
 
 # pretty print config at the start of the run using Rich library
 print_config: True

@@ -1,5 +1,5 @@
 import pathlib
-from typing import Optional
+from typing import Optional, Tuple
 
 import torch
 from pytorch_lightning import LightningDataModule
@@ -16,7 +16,7 @@ class Dataset_RNN(Dataset):
         end_date,
         periods_forward,
     ):
-        self.data = celled_data[start_date:(end_date - periods_forward)]
+        self.data = celled_data[start_date : (end_date - periods_forward)]
         self.size = self.data.shape[0]
         self.periods_forward = periods_forward
 
@@ -61,8 +61,7 @@ class WeatherDataModule(LightningDataModule):
         event_col: str = "value",
         x_col: str = "x",
         y_col: str = "y",
-        valid_periods: int = 365,
-        test_periods: int = 365,
+        train_val_test_split: Tuple[float] = (0.8, 0.1, 0.1),
         periods_forward: int = 1,
         batch_size: int = 64,
         num_workers: int = 0,
@@ -88,8 +87,7 @@ class WeatherDataModule(LightningDataModule):
         self.data_train: Optional[Dataset] = None
         self.data_val: Optional[Dataset] = None
         self.data_test: Optional[Dataset] = None
-        self.valid_periods = valid_periods
-        self.test_periods = test_periods
+        self.train_val_test_split = train_val_test_split
         self.periods_forward = periods_forward
 
         self.batch_size = batch_size
@@ -149,19 +147,20 @@ class WeatherDataModule(LightningDataModule):
             )
             celled_data = torch.load(celled_data_path)
             train_start = 0
-            train_end = celled_data.shape[0] - self.valid_periods - self.test_periods
+            train_end = int(self.train_val_test_split[0] * celled_data.shape[0])
             self.data_train = Dataset_RNN(
                 celled_data, train_start, train_end, self.periods_forward
             )
-            valid_start = celled_data.shape[0] - self.valid_periods - self.test_periods
-            valid_end = celled_data.shape[0] - self.test_periods
-            self.data_val = Dataset_RNN(
-                celled_data, valid_start, valid_end, self.periods_forward
+            valid_end = int(
+                (self.train_val_test_split[0] + self.train_val_test_split[1])
+                * celled_data.shape[0]
             )
-            test_start = celled_data.shape[0] - self.test_periods
+            self.data_val = Dataset_RNN(
+                celled_data, train_end, valid_end, self.periods_forward
+            )
             test_end = celled_data.shape[0]
             self.data_test = Dataset_RNN(
-                celled_data, test_start, test_end, self.periods_forward
+                celled_data, valid_end, test_end, self.periods_forward
             )
 
     def train_dataloader(self):
