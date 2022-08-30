@@ -35,8 +35,8 @@ original_work_dir: ${hydra:runtime.cwd}
 
 # path to folder with data
 data_dir: ${original_work_dir}/data/
-dataset_name: "gtk_20y" 
-num_epochs: 5
+dataset_name: "pdsi_iowa_60y" 
+num_epochs: 30
 
 # pretty print config at the start of the run using Rich library
 print_config: True
@@ -56,4 +56,4 @@ seed: null
 
 # default name for the experiment, determines logging folder path
 # (you can overwrite this name in experiment configs)
-name: ${dataset_name}
+name: ${dataset_name}_${model._target_}

@@ -215,6 +215,7 @@ class RCNNModule(LightningModule):
                 r2table[x][y] = self.test_metric(
                     all_preds[:, 0, x, y], all_targets[:, 0, x, y]
                 )
+                print(r2table[x][y])
 
         self.log("test/R2_std", np.std(r2table), on_epoch=True, prog_bar=True)
         self.log("test/R2_mean", np.mean(r2table), on_epoch=True, prog_bar=True)

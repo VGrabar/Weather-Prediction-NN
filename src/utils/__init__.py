@@ -78,7 +78,9 @@ def print_config(
     quee = []
 
     for field in print_order:
-        quee.append(field) if field in config else log.info(f"Field '{field}' not found in config")
+        quee.append(field) if field in config else log.info(
+            f"Field '{field}' not found in config"
+        )
 
     for field in config:
         if field not in quee:
