@@ -11,8 +11,6 @@ import tqdm
 def create_celled_data(
     data_path,
     dataset_name,
-    n_cells_hor: int = 200,
-    n_cells_ver: int = 250,
     left_border: int = 0,
     down_border: int = 0,
     right_border: int = 2000,
@@ -25,22 +23,25 @@ def create_celled_data(
 
     data_path = pathlib.Path(
         data_path,
-        dataset_name + ".csv",
+        dataset_name,
     )
 
     df = pd.read_csv(data_path)
     df.sort_values(by=[time_col], inplace=True)
     df = df[[event_col, x_col, y_col, time_col]]
+    print("statistics")
+    print(df[event_col].describe())
 
     indicies = range(df.shape[0])
     start_date = int(df[time_col][indicies[0]])
     finish_date = int(df[time_col][indicies[-1]])
+    n_cells_hor = df[x_col].max() - df[x_col].min() + 1
+    print(n_cells_hor)
+    n_cells_ver = df[y_col].max() - df[y_col].min() + 1
+    print(n_cells_ver)
     celled_data = torch.zeros(
         [finish_date - start_date + 1, 1, n_cells_hor, n_cells_ver]
     )
-
-    cell_size_hor = (right_border - left_border) / n_cells_hor
-    cell_size_ver = (up_border - down_border) / n_cells_ver
 
     for i in tqdm.tqdm(indicies):
         if (
@@ -50,8 +51,10 @@ def create_celled_data(
             and (df[y_col][i] < up_border)
         ):
 
-            x = int(df[x_col][i] / cell_size_hor)
-            y = int(df[y_col][i] / cell_size_ver)
+            x = int(df[x_col][i])
+            y = int(df[y_col][i])
             celled_data[int(df[time_col][i]) - start_date, 0, x, y] = df[event_col][i]
+
+    print(celled_data.shape)
 
     return celled_data

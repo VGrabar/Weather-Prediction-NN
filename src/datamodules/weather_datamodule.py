@@ -4,19 +4,14 @@ from typing import Optional, Tuple
 import torch
 from pytorch_lightning import LightningDataModule
 from torch.utils.data import DataLoader, Dataset
+from torchvision import transforms
 
 from src.utils.data_utils import create_celled_data
 
 
 class Dataset_RNN(Dataset):
-    def __init__(
-        self,
-        celled_data,
-        start_date,
-        end_date,
-        periods_forward,
-    ):
-        self.data = celled_data[start_date : (end_date - periods_forward)]
+    def __init__(self, celled_data, start_date, end_date, periods_forward, transforms):
+        self.data = transforms(celled_data[start_date : (end_date - periods_forward)])
         self.size = self.data.shape[0]
         self.periods_forward = periods_forward
 
@@ -51,12 +46,12 @@ class WeatherDataModule(LightningDataModule):
         self,
         data_dir: str = "data",
         dataset_name: str = "dataset_name",
-        n_cells_hor: int = 200,
-        n_cells_ver: int = 250,
         left_border: int = 0,
         down_border: int = 0,
         right_border: int = 2000,
         up_border: int = 2500,
+        n_cells_hor: int = 100,
+        n_cells_ver: int = 100,
         time_col: str = "time",
         event_col: str = "value",
         x_col: str = "x",
@@ -73,12 +68,15 @@ class WeatherDataModule(LightningDataModule):
         self.save_hyperparameters(logger=False)
         self.data_dir = data_dir
         self.dataset_name = dataset_name
-        self.n_cells_hor = n_cells_hor
-        self.n_cells_ver = n_cells_ver
         self.left_border = left_border
         self.right_border = right_border
         self.down_border = down_border
         self.up_border = up_border
+        self.n_cells_hor = n_cells_hor
+        self.n_cells_ver = n_cells_ver
+        self.transforms = transforms.Compose(
+            [transforms.Resize((self.n_cells_hor, self.n_cells_ver))]
+        )
         self.time_col = time_col
         self.event_col = event_col
         self.x_col = x_col
@@ -113,8 +111,6 @@ class WeatherDataModule(LightningDataModule):
             celled_data = create_celled_data(
                 self.data_dir,
                 self.dataset_name,
-                self.n_cells_hor,
-                self.n_cells_ver,
                 self.left_border,
                 self.down_border,
                 self.right_border,
@@ -149,18 +145,22 @@ class WeatherDataModule(LightningDataModule):
             train_start = 0
             train_end = int(self.train_val_test_split[0] * celled_data.shape[0])
             self.data_train = Dataset_RNN(
-                celled_data, train_start, train_end, self.periods_forward
+                celled_data,
+                train_start,
+                train_end,
+                self.periods_forward,
+                self.transforms,
             )
             valid_end = int(
                 (self.train_val_test_split[0] + self.train_val_test_split[1])
                 * celled_data.shape[0]
             )
             self.data_val = Dataset_RNN(
-                celled_data, train_end, valid_end, self.periods_forward
+                celled_data, train_end, valid_end, self.periods_forward, self.transforms
             )
             test_end = celled_data.shape[0]
             self.data_test = Dataset_RNN(
-                celled_data, valid_end, test_end, self.periods_forward
+                celled_data, valid_end, test_end, self.periods_forward, self.transforms
             )
 
     def train_dataloader(self):

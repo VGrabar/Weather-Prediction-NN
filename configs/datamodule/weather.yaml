@@ -2,18 +2,18 @@ _target_: src.datamodules.weather_datamodule.WeatherDataModule
 
 data_dir: ${data_dir}  # data_dir is specified in config.yaml
 dataset_name: ${dataset_name}  # dataset_name is specified in config.yaml
-n_cells_hor: 73
-n_cells_ver: 149
 left_border: 0
 down_border: 0
 right_border: 200
 up_border: 250
+n_cells_hor: 100
+n_cells_ver: 100
 time_col: "date"
 event_col: "val"
 x_col: "x"
 y_col: "y"
 train_val_test_split: [0.7, 0.1, 0.2]
 periods_forward: 24
-batch_size: 4
+batch_size: ${batch_size}
 num_workers: 0
 pin_memory: False
