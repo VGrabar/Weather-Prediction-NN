@@ -13,7 +13,7 @@ event_col: "val"
 x_col: "x"
 y_col: "y"
 train_val_test_split: [0.7, 0.1, 0.2]
-periods_forward: 24
+periods_forward: 12
 batch_size: ${batch_size}
 num_workers: 0
 pin_memory: False

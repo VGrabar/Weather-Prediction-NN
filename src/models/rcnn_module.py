@@ -8,7 +8,7 @@ from torch.autograd import Variable
 
 from src.models.components.conv_block import ConvBlock
 from src.utils.metrics import rmse, rsquared, smape
-from src.utils.plotting import make_confusion_matrix, make_pred_vs_target_plot
+from src.utils.plotting import make_heatmap, make_pred_vs_target_plot
 
 
 class RCNNModule(LightningModule):
@@ -215,12 +215,16 @@ class RCNNModule(LightningModule):
                 r2table[x][y] = self.test_metric(
                     all_preds[:, 0, x, y], all_targets[:, 0, x, y]
                 )
-                print(r2table[x][y])
 
         self.log("test/R2_std", np.std(r2table), on_epoch=True, prog_bar=True)
         self.log("test/R2_mean", np.mean(r2table), on_epoch=True, prog_bar=True)
         self.log("test/R2_min", np.min(r2table), on_epoch=True, prog_bar=True)
         self.log("test/R2_max", np.max(r2table), on_epoch=True, prog_bar=True)
+
+        # log R2 table
+        image_name = "confusion_matrix.png"
+        image_path = make_heatmap(r2table, image_name)
+        #self.logger.experiment.log_image(image_path, name="R2 Spatial Distribution")
 
         # log plots
         image_name = "preds_targets.png"
@@ -235,7 +239,7 @@ class RCNNModule(LightningModule):
             ylabel_rotate=0,
             filename=image_name,
         )
-        # self.logger.experiment.add_image("img", image_name, 0)
+        #self.logger.Experiment.log_image("img", image_name, 0)
 
     def on_epoch_end(self):
         pass

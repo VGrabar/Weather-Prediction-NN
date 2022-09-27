@@ -29,16 +29,12 @@ def create_celled_data(
     df = pd.read_csv(data_path)
     df.sort_values(by=[time_col], inplace=True)
     df = df[[event_col, x_col, y_col, time_col]]
-    print("statistics")
-    print(df[event_col].describe())
 
     indicies = range(df.shape[0])
     start_date = int(df[time_col][indicies[0]])
     finish_date = int(df[time_col][indicies[-1]])
     n_cells_hor = df[x_col].max() - df[x_col].min() + 1
-    print(n_cells_hor)
     n_cells_ver = df[y_col].max() - df[y_col].min() + 1
-    print(n_cells_ver)
     celled_data = torch.zeros(
         [finish_date - start_date + 1, 1, n_cells_hor, n_cells_ver]
     )
@@ -55,6 +51,5 @@ def create_celled_data(
             y = int(df[y_col][i])
             celled_data[int(df[time_col][i]) - start_date, 0, x, y] = df[event_col][i]
 
-    print(celled_data.shape)
 
     return celled_data

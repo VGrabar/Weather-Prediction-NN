@@ -102,10 +102,6 @@ class WeatherDataModule(LightningDataModule):
             self.data_dir,
             "celled",
             self.dataset_name
-            + "_"
-            + str(self.n_cells_hor)
-            + "x"
-            + str(self.n_cells_ver),
         )
         if not celled_data_path.is_file():
             celled_data = create_celled_data(
@@ -136,10 +132,6 @@ class WeatherDataModule(LightningDataModule):
                 self.data_dir,
                 "celled",
                 self.dataset_name
-                + "_"
-                + str(self.n_cells_hor)
-                + "x"
-                + str(self.n_cells_ver),
             )
             celled_data = torch.load(celled_data_path)
             train_start = 0
