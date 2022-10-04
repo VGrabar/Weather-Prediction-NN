@@ -13,7 +13,7 @@ def make_heatmap(table, filename, size=(8, 6), linewidth=0.5, center=0):
     fig = Figure(figsize=size, frameon=False)
     canvas = FigureCanvas(fig)
     ax = fig.add_subplot(111)
-    ax = sns.heatmap(table, linewidth, center)
+    ax = sns.heatmap(table, linewidth, center=None)
 
     full_path = os.path.expanduser(filename)
     ax.figure.savefig(full_path)
