@@ -1,0 +1,9 @@
+_target_: src.models.vit_module.ViTModule
+
+embedding_size: 16
+hidden_state_size: 32
+n_cells_hor: 200
+n_cells_ver: 250
+batch_size: 1
+lr: 0.003
+weight_decay: 0
