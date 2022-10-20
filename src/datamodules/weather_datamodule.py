@@ -10,17 +10,18 @@ from src.utils.data_utils import create_celled_data
 
 
 class Dataset_RNN(Dataset):
-    def __init__(self, celled_data, start_date, end_date, periods_forward, transforms):
-        self.data = transforms(celled_data[start_date : (end_date - periods_forward)])
+    def __init__(self, celled_data, start_date, end_date, periods_forward, history_length, transforms):
+        self.data = transforms(celled_data[start_date + history_length : (end_date - periods_forward)])
         self.size = self.data.shape[0]
         self.periods_forward = periods_forward
+        self.history_length = history_length
 
     def __len__(self):
         return self.size
 
     def __getitem__(self, idx):
         return (
-            self.data[idx],
+            self.data[idx - self.history_length : idx + 1],
             self.data[idx + self.periods_forward],
         )
 
@@ -58,6 +59,7 @@ class WeatherDataModule(LightningDataModule):
         y_col: str = "y",
         train_val_test_split: Tuple[float] = (0.8, 0.1, 0.1),
         periods_forward: int = 1,
+        history_length: int = 1,
         batch_size: int = 64,
         num_workers: int = 0,
         pin_memory: bool = False,
@@ -87,6 +89,7 @@ class WeatherDataModule(LightningDataModule):
         self.data_test: Optional[Dataset] = None
         self.train_val_test_split = train_val_test_split
         self.periods_forward = periods_forward
+        self.history_length = history_length
 
         self.batch_size = batch_size
         self.num_workers = num_workers
@@ -141,6 +144,7 @@ class WeatherDataModule(LightningDataModule):
                 train_start,
                 train_end,
                 self.periods_forward,
+                self.history_length,
                 self.transforms,
             )
             valid_end = int(
@@ -148,12 +152,13 @@ class WeatherDataModule(LightningDataModule):
                 * celled_data.shape[0]
             )
             self.data_val = Dataset_RNN(
-                celled_data, train_end, valid_end, self.periods_forward, self.transforms
+                celled_data, train_end, valid_end, self.periods_forward, self.history_length, self.transforms
             )
             test_end = celled_data.shape[0]
             self.data_test = Dataset_RNN(
-                celled_data, valid_end, test_end, self.periods_forward, self.transforms
+                celled_data, valid_end, test_end, self.periods_forward, self.history_length, self.transforms
             )
+            print(len(self.data_train), len(self.data_val), len(self.data_test))
 
     def train_dataloader(self):
 
