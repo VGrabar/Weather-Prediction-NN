@@ -21,7 +21,8 @@ class Dataset_RNN(Dataset):
 
     def __getitem__(self, idx):
         return (
-            self.data[idx - self.history_length : idx + 1],
+            #self.data[idx - self.history_length : idx + 1],
+            self.data[idx],
             self.data[idx + self.periods_forward],
         )
 
@@ -158,7 +159,6 @@ class WeatherDataModule(LightningDataModule):
             self.data_test = Dataset_RNN(
                 celled_data, valid_end, test_end, self.periods_forward, self.history_length, self.transforms
             )
-            print(len(self.data_train), len(self.data_val), len(self.data_test))
 
     def train_dataloader(self):
 
