@@ -21,8 +21,7 @@ class Dataset_RNN(Dataset):
 
     def __getitem__(self, idx):
         return (
-            #self.data[idx - self.history_length : idx + 1],
-            self.data[idx],
+            self.data[idx - self.history_length + 1 : idx + 1],
             self.data[idx + self.periods_forward],
         )
 

@@ -31,6 +31,7 @@ class RCNNModule(LightningModule):
         hidden_state_size: int = 32,
         n_cells_hor: int = 200,
         n_cells_ver: int = 250,
+        history_length: int = 1,
         batch_size: int = 1,
         lr: float = 0.003,
         weight_decay: float = 0.0,
@@ -43,6 +44,7 @@ class RCNNModule(LightningModule):
 
         self.n_cells_hor = n_cells_hor
         self.n_cells_ver = n_cells_ver
+        self.history_length = history_length
         self.batch_size = batch_size
         self.lr = lr
         self.weight_decay = weight_decay

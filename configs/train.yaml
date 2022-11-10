@@ -58,3 +58,8 @@ seed: null
 # default name for the experiment, determines logging folder path
 # (you can overwrite this name in experiment configs)
 name: ${dataset_name}_${model._target_}
+
+# parameters of the model that are shared with dataloader
+n_cells_hor: 20
+n_cells_ver: 40
+history_length: 1

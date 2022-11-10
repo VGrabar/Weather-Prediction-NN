@@ -2,8 +2,9 @@ _target_: src.models.rcnn_module.RCNNModule
 
 embedding_size: 16
 hidden_state_size: 32
-n_cells_hor: 20
-n_cells_ver: 40
+n_cells_hor: ${n_cells_hor}
+n_cells_ver: ${n_cells_ver}
+history_length: ${history_length}
 batch_size: ${batch_size}
 lr: 0.003
 weight_decay: 0

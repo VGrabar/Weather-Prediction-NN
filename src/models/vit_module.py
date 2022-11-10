@@ -9,6 +9,24 @@ from torch.autograd import Variable
 from src.models.components.conv_block import ConvBlock
 from src.utils.metrics import rmse, rsquared, smape
 from src.utils.plotting import make_confusion_matrix, make_pred_vs_target_plot
+from components.attention_block import AttentionBlock
+
+
+def cell_to_patch(x, patch_size, flatten_channels=True):
+    """
+    Inputs:
+        x - torch.Tensor representing the image of shape [B, C, H, W]
+        patch_size - Number of pixels per dimension of the patches (integer)
+        flatten_channels - If True, the patches will be returned in a flattened format
+                           as a feature vector instead of a image grid.
+    """
+    B, C, H, W = x.shape
+    x = x.reshape(B, C, H//patch_size, patch_size, W//patch_size, patch_size)
+    x = x.permute(0, 2, 4, 1, 3, 5) # [B, H', W', C, p_H, p_W]
+    x = x.flatten(1,2)              # [B, H'*W', C, p_H, p_W]
+    if flatten_channels:
+        x = x.flatten(2,4)          # [B, H'*W', C*p_H*p_W]
+    return x
 
 
 class ViTModule(LightningModule):
@@ -18,85 +36,51 @@ class ViTModule(LightningModule):
 
     def __init__(
         self,
-        embedding_size: int = 16,
-        hidden_state_size: int = 32,
-        n_cells_hor: int = 200,
-        n_cells_ver: int = 250,
-        batch_size: int = 1,
+        embed_dim,
+        hidden_dim,
+        num_channels,
+        num_heads,
+        num_layers,
+        num_classes,
+        patch_size,
+        num_patches,
+        dropout: float = 0.0,
         lr: float = 0.003,
         weight_decay: float = 0.0,
     ):
-        super(self.__class__, self).__init__()
+        """
+        Inputs:
+            embed_dim - Dimensionality of the input feature vectors to the Transformer
+            hidden_dim - Dimensionality of the hidden layer in the feed-forward networks
+                         within the Transformer
+            num_channels - Number of channels of the input (3 for RGB)
+            num_heads - Number of heads to use in the Multi-Head Attention block
+            num_layers - Number of layers to use in the Transformer
+            patch_size - Number of pixels that the patches have per dimension
+            num_patches - Maximum number of patches an image can have
+            dropout - Amount of dropout to apply in the feed-forward network and
+                      on the input encoding
+        """
+        super().__init__()
 
-        # this line allows to access init params with 'self.hparams' attribute
-        # it also ensures init params will be stored in ckpt
-        self.save_hyperparameters(logger=False)
+        self.patch_size = patch_size
 
-        self.n_cells_hor = n_cells_hor
-        self.n_cells_ver = n_cells_ver
-        self.batch_size = batch_size
-        self.lr = lr
-        self.weight_decay = weight_decay
+        # Layers/Networks
+        self.input_layer = nn.Linear(num_channels * (patch_size**2), embed_dim)
+        self.transformer = nn.Sequential(
+            *[
+                AttentionBlock(embed_dim, hidden_dim, num_heads, dropout=dropout)
+                for _ in range(num_layers)
+            ]
+        )
+        self.mlp_head = nn.Sequential(
+            nn.LayerNorm(embed_dim), nn.Linear(embed_dim, num_classes)
+        )
+        self.dropout = nn.Dropout(dropout)
 
-        self.emb_size = embedding_size
-        self.hid_size = hidden_state_size
-
-        self.embedding = nn.Sequential(
-            ConvBlock(1, self.emb_size, 3),
-            nn.ReLU(),
-            ConvBlock(self.emb_size, self.emb_size, 3),
-        )
-        self.hidden_to_result = nn.Sequential(
-            ConvBlock(hidden_state_size, 2, kernel_size=3),
-            nn.Softmax(dim=1),
-        )
-
-        self.f_t = nn.Sequential(
-            ConvBlock(self.hid_size + self.emb_size, self.hid_size, 3), nn.Sigmoid()
-        )
-        self.i_t = nn.Sequential(
-            ConvBlock(self.hid_size + self.emb_size, self.hid_size, 3), nn.Sigmoid()
-        )
-        self.c_t = nn.Sequential(
-            ConvBlock(self.hid_size + self.emb_size, self.hid_size, 3), nn.Tanh()
-        )
-        self.o_t = nn.Sequential(
-            ConvBlock(self.hid_size + self.emb_size, self.hid_size, 3), nn.Sigmoid()
-        )
-
-        self.final_conv = nn.Sequential(
-            nn.Conv2d(
-                self.hid_size,
-                self.hid_size,
-                kernel_size=3,
-                stride=1,
-                padding=1,
-                bias=False,
-            ),
-            nn.ReLU(),
-            nn.Conv2d(self.hid_size, 1, kernel_size=1, stride=1, padding=0, bias=False),
-        )
-
-        self.register_buffer(
-            "prev_state_h",
-            torch.zeros(
-                self.batch_size,
-                self.hid_size,
-                self.n_cells_hor,
-                self.n_cells_ver,
-                requires_grad=False,
-            ),
-        )
-        self.register_buffer(
-            "prev_state_c",
-            torch.zeros(
-                self.batch_size,
-                self.hid_size,
-                self.n_cells_hor,
-                self.n_cells_ver,
-                requires_grad=False,
-            ),
-        )
+        # Parameters/Embeddings
+        self.cls_token = nn.Parameter(torch.randn(1, 1, embed_dim))
+        self.pos_embedding = nn.Parameter(torch.randn(1, 1 + num_patches, embed_dim))
 
         # use separate metric instance for train, val and test step
         # to ensure a proper reduction over the epoch
@@ -106,6 +90,29 @@ class ViTModule(LightningModule):
 
         # loss
         self.criterion = nn.MSELoss()
+        self.lr = lr
+        self.weight_decay = weight_decay
+        
+    def forward(self, x):
+        # Preprocess input
+        x = cell_to_patch(x, self.patch_size)
+        B, T, _ = x.shape
+        x = self.input_layer(x)
+
+        # Add CLS token and positional encoding
+        cls_token = self.cls_token.repeat(B, 1, 1)
+        x = torch.cat([cls_token, x], dim=1)
+        x = x + self.pos_embedding[:,:T+1]
+
+        # Apply Transforrmer
+        x = self.dropout(x)
+        x = x.transpose(0, 1)
+        x = self.transformer(x)
+
+        # Perform classification prediction
+        cls = x[0]
+        out = self.mlp_head(cls)
+        return out
 
     def forward(self, x: torch.Tensor):
         prev_c = self.prev_state_c
@@ -136,9 +143,6 @@ class ViTModule(LightningModule):
         loss = self.criterion(preds, y)
         return loss, preds, y
 
-    def on_after_backward(self) -> None:
-        self.prev_state_c.detach_()
-        self.prev_state_h.detach_()
 
     def training_step(self, batch: Any, batch_idx: int):
         loss, preds, targets = self.step(batch)

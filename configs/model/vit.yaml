@@ -1,7 +1,13 @@
 _target_: src.models.vit_module.ViTModule
 
-embedding_size: 16
-hidden_state_size: 32
+embed_dim:  16
+hidden_dim:  32
+num_channels: 1
+num_heads: 1
+num_layers: 1
+patch_size: 10
+num_patches: 5
+dropout: 0.3
 n_cells_hor: 200
 n_cells_ver: 250
 batch_size: 1
