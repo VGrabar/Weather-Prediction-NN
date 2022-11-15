@@ -11,7 +11,7 @@ from src.utils.data_utils import create_celled_data
 
 class Dataset_RNN(Dataset):
     def __init__(self, celled_data, start_date, end_date, periods_forward, history_length, transforms):
-        self.data = transforms(celled_data[start_date + history_length : (end_date - periods_forward)])
+        self.data = transforms(celled_data[start_date : (end_date - periods_forward)])
         self.size = self.data.shape[0]
         self.periods_forward = periods_forward
         self.history_length = history_length
@@ -20,11 +20,16 @@ class Dataset_RNN(Dataset):
         return self.size
 
     def __getitem__(self, idx):
-        return (
-            #self.data[idx - self.history_length : idx + 1],
-            self.data[idx],
-            self.data[idx + self.periods_forward],
-        )
+        if (idx - self.history_length + 1) >= 0:
+            return (
+                self.data[idx - self.history_length + 1 : idx + 1],
+                self.data[idx + self.periods_forward],
+            )
+        else:
+            return (
+                self.data[0 : self.history_length],
+                self.data[self.history_length - 1 + self.periods_forward],
+            )
 
 
 class WeatherDataModule(LightningDataModule):
@@ -61,6 +66,8 @@ class WeatherDataModule(LightningDataModule):
         train_val_test_split: Tuple[float] = (0.8, 0.1, 0.1),
         periods_forward: int = 1,
         history_length: int = 1,
+        data_start: int = 0,
+        data_len: int = 100,
         batch_size: int = 64,
         num_workers: int = 0,
         pin_memory: bool = False,
@@ -91,6 +98,8 @@ class WeatherDataModule(LightningDataModule):
         self.train_val_test_split = train_val_test_split
         self.periods_forward = periods_forward
         self.history_length = history_length
+        self.data_start = data_start
+        self.data_len = data_len
 
         self.batch_size = batch_size
         self.num_workers = num_workers
@@ -138,6 +147,7 @@ class WeatherDataModule(LightningDataModule):
                 self.dataset_name
             )
             celled_data = torch.load(celled_data_path)
+            celled_data = celled_data[self.data_start : self.data_start + self.data_len]
             train_start = 0
             train_end = int(self.train_val_test_split[0] * celled_data.shape[0])
             self.data_train = Dataset_RNN(

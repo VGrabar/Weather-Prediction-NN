@@ -1,6 +1,6 @@
 **.csv
-*.ipynb
-*.DS_Store
+**.ipynb
+**.DS_Store
 *.pyc
 data/
 logs/

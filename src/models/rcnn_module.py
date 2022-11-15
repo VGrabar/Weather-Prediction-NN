@@ -31,6 +31,7 @@ class RCNNModule(LightningModule):
         hidden_state_size: int = 32,
         n_cells_hor: int = 200,
         n_cells_ver: int = 250,
+        history_length: int = 1,
         batch_size: int = 1,
         lr: float = 0.003,
         weight_decay: float = 0.0,
@@ -43,6 +44,7 @@ class RCNNModule(LightningModule):
 
         self.n_cells_hor = n_cells_hor
         self.n_cells_ver = n_cells_ver
+        self.history_length = history_length
         self.batch_size = batch_size
         self.lr = lr
         self.weight_decay = weight_decay
@@ -51,7 +53,7 @@ class RCNNModule(LightningModule):
         self.hid_size = hidden_state_size
 
         self.embedding = nn.Sequential(
-            ConvBlock(1, self.emb_size, 3),
+            ConvBlock(history_length, self.emb_size, 3),
             nn.ReLU(),
             ConvBlock(self.emb_size, self.emb_size, 3),
         )
@@ -165,9 +167,10 @@ class RCNNModule(LightningModule):
 
         for i in range(1, len(outputs)):
             all_preds = torch.cat((all_preds, outputs[i]["preds"]), 0)
-            all_targets = torch.cat((all_targets, outputs[i]["preds"]), 0)
+            all_targets = torch.cat((all_targets, outputs[i]["targets"]), 0)
 
         # log metrics
+        all_preds = torch.squeeze(all_preds, 1)
         train_metric = self.train_metric(all_preds, all_targets)
         self.log("train/R2", train_metric, on_epoch=True, prog_bar=True)
         pass
@@ -184,10 +187,12 @@ class RCNNModule(LightningModule):
 
         for i in range(1, len(outputs)):
             all_preds = torch.cat((all_preds, outputs[i]["preds"]), 0)
-            all_targets = torch.cat((all_targets, outputs[i]["preds"]), 0)
+            all_targets = torch.cat((all_targets, outputs[i]["targets"]), 0)
 
         # log metrics
+        all_preds = torch.squeeze(all_preds, 1)
         val_metric = self.val_metric(all_preds, all_targets)
+        print(val_metric)
         self.log("val/R2", val_metric, on_epoch=True, prog_bar=True)
 
     def test_step(self, batch: Any, batch_idx: int):
@@ -202,18 +207,19 @@ class RCNNModule(LightningModule):
 
         for i in range(1, len(outputs)):
             all_preds = torch.cat((all_preds, outputs[i]["preds"]), 0)
-            all_targets = torch.cat((all_targets, outputs[i]["preds"]), 0)
+            all_targets = torch.cat((all_targets, outputs[i]["targets"]), 0)
 
         # log metrics
+        all_preds = torch.squeeze(all_preds, 1)
         test_metric = self.test_metric(all_preds, all_targets)
         self.log("test/R2", test_metric, on_epoch=True, prog_bar=True)
 
         # log table
-        r2table = np.zeros((all_preds.shape[2], all_preds.shape[3]))
-        for x in range(all_preds.shape[2]):
-            for y in range(all_preds.shape[3]):
+        r2table = np.zeros((all_preds.shape[1], all_preds.shape[2]))
+        for x in range(all_preds.shape[1]):
+            for y in range(all_preds.shape[2]):
                 r2table[x][y] = self.test_metric(
-                    all_preds[:, 0, x, y], all_targets[:, 0, x, y]
+                    all_preds[:, x, y], all_targets[:, x, y]
                 )
 
         self.log("test/R2_std", np.std(r2table), on_epoch=True, prog_bar=True)

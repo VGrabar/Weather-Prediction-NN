@@ -36,13 +36,13 @@ def make_pred_vs_target_plot(
     fig = Figure(figsize=size, frameon=False)
     canvas = FigureCanvas(fig)
     ax = fig.add_subplot(111)
-    x_length = targets.shape[2]
-    y_length = targets.shape[3]
+    x_length = targets.shape[1]
+    y_length = targets.shape[2]
     x_random = random.choice(list(range(x_length)))
     y_random = random.choice(list(range(y_length)))
-    targets = targets[:, 0, :, :].cpu()
+    targets = targets.cpu()
     targets = torch.mean(targets, dim=[1, 2])
-    preds = preds[:, 0, :, :].cpu()
+    preds = preds.cpu()
     preds = torch.mean(preds, dim=[1, 2])
     time_periods = np.arange(0, targets.shape[0])
     ax.plot(time_periods, targets, "g-", label="actual")
