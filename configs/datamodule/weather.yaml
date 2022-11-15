@@ -12,9 +12,11 @@ time_col: "date"
 event_col: "val"
 x_col: "x"
 y_col: "y"
-train_val_test_split: [0.8, 0.1, 0.1]
-periods_forward: 6
+train_val_test_split: [0.6, 0.1, 0.3]
+periods_forward: ${periods_forward}
 history_length: ${history_length}
+data_start: 0
+data_len: 500
 batch_size: ${batch_size}
 num_workers: 0
 pin_memory: False

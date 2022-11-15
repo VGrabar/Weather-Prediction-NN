@@ -36,7 +36,7 @@ def create_celled_data(
     n_cells_hor = df[x_col].max() - df[x_col].min() + 1
     n_cells_ver = df[y_col].max() - df[y_col].min() + 1
     celled_data = torch.zeros(
-        [finish_date - start_date + 1, 1, n_cells_hor, n_cells_ver]
+        [finish_date - start_date + 1, n_cells_hor, n_cells_ver]
     )
 
     for i in tqdm.tqdm(indicies):
@@ -49,7 +49,7 @@ def create_celled_data(
 
             x = int(df[x_col][i])
             y = int(df[y_col][i])
-            celled_data[int(df[time_col][i]) - start_date, 0, x, y] = df[event_col][i]
+            celled_data[int(df[time_col][i]) - start_date, x, y] = df[event_col][i]
 
 
     return celled_data
