@@ -1,6 +1,7 @@
 import glob
 
 import numpy as np
+import re
 import torch
 from torchvision import transforms
 
@@ -22,19 +23,20 @@ test_dataset = Dataset_RNN(
 )
 
 range_forward = 36
-num_samples = 20
+num_samples = 21
 predictions = torch.zeros((range_forward, num_samples, dim_x, dim_y))
 
+chkpts = glob.glob("/path/to/*.ckpt", recursive=True)
 for f in range(1, range_forward):
-
-    chkpt_folder = "/path/to/"
-    chkpts = glob.glob("*.ckpt")
+    
+    regex = r'forward=+{periods}.*'.format(periods=f)
     i = 0
     for curr_ckpt in chkpts:
-        curr_model = RCNNModule.load_from_checkpoint()
-        curr_preds = curr_model(test_dataset[-1][0])
-        predictions[f - 1, i, :, :] = curr_preds
-        i += 1
+        if re.search(regex, curr_ckpt):
+            curr_model = RCNNModule.load_from_checkpoint()
+            curr_preds = curr_model(test_dataset[-1][0])
+            predictions[f - 1, i, :, :] = curr_preds
+            i += 1
 
 predictions = predictions.cpu().data.numpy()
 np.save("voronezh_predictions.csv", predictions)
