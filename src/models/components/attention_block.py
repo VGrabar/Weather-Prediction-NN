@@ -1,7 +1,7 @@
 import torch.nn as nn
 
-class AttentionBlock(nn.Module):
 
+class AttentionBlock(nn.Module):
     def __init__(self, embed_dim, hidden_dim, num_heads, dropout=0.0):
         """
         Inputs:
@@ -14,17 +14,15 @@ class AttentionBlock(nn.Module):
         super().__init__()
 
         self.layer_norm_1 = nn.LayerNorm(embed_dim)
-        self.attn = nn.MultiheadAttention(embed_dim, num_heads,
-                                          dropout=dropout)
+        self.attn = nn.MultiheadAttention(embed_dim, num_heads, dropout=dropout)
         self.layer_norm_2 = nn.LayerNorm(embed_dim)
         self.linear = nn.Sequential(
             nn.Linear(embed_dim, hidden_dim),
             nn.GELU(),
             nn.Dropout(dropout),
             nn.Linear(hidden_dim, embed_dim),
-            nn.Dropout(dropout)
+            nn.Dropout(dropout),
         )
-
 
     def forward(self, x):
         inp_x = self.layer_norm_1(x)

@@ -29,6 +29,7 @@ class RCNNModule(LightningModule):
         self,
         embedding_size: int = 16,
         hidden_state_size: int = 32,
+        kernel_size: int = 3,
         n_cells_hor: int = 200,
         n_cells_ver: int = 250,
         history_length: int = 1,
@@ -51,28 +52,65 @@ class RCNNModule(LightningModule):
 
         self.emb_size = embedding_size
         self.hid_size = hidden_state_size
+        self.kernel_size = kernel_size
 
         self.embedding = nn.Sequential(
-            ConvBlock(history_length, self.emb_size, 3),
+            ConvBlock(
+                history_length,
+                self.emb_size,
+                self.kernel_size,
+                stride=1,
+                padding=self.kernel_size // 2,
+            ),
             nn.ReLU(),
-            ConvBlock(self.emb_size, self.emb_size, 3),
-        )
-        self.hidden_to_result = nn.Sequential(
-            ConvBlock(hidden_state_size, 2, kernel_size=3),
-            nn.Softmax(dim=1),
+            ConvBlock(
+                self.emb_size,
+                self.emb_size,
+                self.kernel_size,
+                stride=1,
+                padding=self.kernel_size // 2,
+            ),
         )
 
         self.f_t = nn.Sequential(
-            ConvBlock(self.hid_size + self.emb_size, self.hid_size, 3), nn.Sigmoid()
+            ConvBlock(
+                self.hid_size + self.emb_size,
+                self.hid_size,
+                self.kernel_size,
+                stride=1,
+                padding=self.kernel_size // 2,
+            ),
+            nn.Sigmoid(),
         )
         self.i_t = nn.Sequential(
-            ConvBlock(self.hid_size + self.emb_size, self.hid_size, 3), nn.Sigmoid()
+            ConvBlock(
+                self.hid_size + self.emb_size,
+                self.hid_size,
+                self.kernel_size,
+                stride=1,
+                padding=self.kernel_size // 2,
+            ),
+            nn.Sigmoid(),
         )
         self.c_t = nn.Sequential(
-            ConvBlock(self.hid_size + self.emb_size, self.hid_size, 3), nn.Tanh()
+            ConvBlock(
+                self.hid_size + self.emb_size,
+                self.hid_size,
+                self.kernel_size,
+                stride=1,
+                padding=self.kernel_size // 2,
+            ),
+            nn.Tanh(),
         )
         self.o_t = nn.Sequential(
-            ConvBlock(self.hid_size + self.emb_size, self.hid_size, 3), nn.Sigmoid()
+            ConvBlock(
+                self.hid_size + self.emb_size,
+                self.hid_size,
+                self.kernel_size,
+                stride=1,
+                padding=self.kernel_size // 2,
+            ),
+            nn.Sigmoid(),
         )
 
         self.final_conv = nn.Sequential(
@@ -192,7 +230,6 @@ class RCNNModule(LightningModule):
         # log metrics
         all_preds = torch.squeeze(all_preds, 1)
         val_metric = self.val_metric(all_preds, all_targets)
-        print(val_metric)
         self.log("val/R2", val_metric, on_epoch=True, prog_bar=True)
 
     def test_step(self, batch: Any, batch_idx: int):
@@ -226,11 +263,11 @@ class RCNNModule(LightningModule):
         self.log("test/R2_mean", np.mean(r2table), on_epoch=True, prog_bar=True)
         self.log("test/R2_min", np.min(r2table), on_epoch=True, prog_bar=True)
         self.log("test/R2_max", np.max(r2table), on_epoch=True, prog_bar=True)
-
+        
         # log R2 table
         image_name = "confusion_matrix.png"
         image_path = make_heatmap(r2table, image_name)
-        #self.logger.experiment.log_image(image_path, name="R2 Spatial Distribution")
+        # self.logger.experiment.log_image(image_path, name="R2 Spatial Distribution")
 
         # log plots
         image_name = "preds_targets.png"
@@ -245,7 +282,7 @@ class RCNNModule(LightningModule):
             ylabel_rotate=0,
             filename=image_name,
         )
-        #self.logger.Experiment.log_image("img", image_name, 0)
+        # self.logger.Experiment.log_image("img", image_name, 0)
 
     def on_epoch_end(self):
         pass
