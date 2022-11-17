@@ -148,7 +148,7 @@ class WeatherDataModule(LightningDataModule):
             )
             celled_data = torch.load(celled_data_path)
             celled_data = celled_data[self.data_start : self.data_start + self.data_len]
-            train_start = 0
+            train_start = 0 # self.history_len - 1
             train_end = int(self.train_val_test_split[0] * celled_data.shape[0])
             self.data_train = Dataset_RNN(
                 celled_data,

@@ -21,11 +21,11 @@ def cell_to_patch(x, patch_size, flatten_channels=True):
                            as a feature vector instead of a image grid.
     """
     B, C, H, W = x.shape
-    x = x.reshape(B, C, H//patch_size, patch_size, W//patch_size, patch_size)
-    x = x.permute(0, 2, 4, 1, 3, 5) # [B, H', W', C, p_H, p_W]
-    x = x.flatten(1,2)              # [B, H'*W', C, p_H, p_W]
+    x = x.reshape(B, C, H // patch_size, patch_size, W // patch_size, patch_size)
+    x = x.permute(0, 2, 4, 1, 3, 5)  # [B, H', W', C, p_H, p_W]
+    x = x.flatten(1, 2)  # [B, H'*W', C, p_H, p_W]
     if flatten_channels:
-        x = x.flatten(2,4)          # [B, H'*W', C*p_H*p_W]
+        x = x.flatten(2, 4)  # [B, H'*W', C*p_H*p_W]
     return x
 
 
@@ -92,7 +92,7 @@ class ViTModule(LightningModule):
         self.criterion = nn.MSELoss()
         self.lr = lr
         self.weight_decay = weight_decay
-        
+
     def forward(self, x):
         # Preprocess input
         x = cell_to_patch(x, self.patch_size)
@@ -102,7 +102,7 @@ class ViTModule(LightningModule):
         # Add CLS token and positional encoding
         cls_token = self.cls_token.repeat(B, 1, 1)
         x = torch.cat([cls_token, x], dim=1)
-        x = x + self.pos_embedding[:,:T+1]
+        x = x + self.pos_embedding[:, : T + 1]
 
         # Apply Transforrmer
         x = self.dropout(x)
@@ -142,7 +142,6 @@ class ViTModule(LightningModule):
         preds = self.forward(x)
         loss = self.criterion(preds, y)
         return loss, preds, y
-
 
     def training_step(self, batch: Any, batch_idx: int):
         loss, preds, targets = self.step(batch)
