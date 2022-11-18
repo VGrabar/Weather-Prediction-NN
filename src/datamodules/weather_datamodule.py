@@ -10,26 +10,41 @@ from src.utils.data_utils import create_celled_data
 
 
 class Dataset_RNN(Dataset):
-    def __init__(self, celled_data, start_date, end_date, periods_forward, history_length, transforms):
-        self.data = transforms(celled_data[start_date : (end_date - periods_forward)])
-        self.size = self.data.shape[0]
+    """
+    Simple Torch Dataset for many-to-many RNN
+        celled_data: source of data,
+        start_date: start date index,
+        end_date: end date index,
+        periods_forward: number of future periods for a target,
+        history_length: number of past periods for an input,
+        transforms: input data manipulations
+    """
+    def __init__(
+        self,
+        celled_data: torch.Tensor,
+        start_date: int,
+        end_date: int,
+        periods_forward: int,
+        history_length: int,
+        transforms,
+    ):
+        self.data = transforms(celled_data[start_date:end_date])
         self.periods_forward = periods_forward
         self.history_length = history_length
 
     def __len__(self):
-        return self.size
+        return len(self.size) - self.periods_forward - self.history_length
 
     def __getitem__(self, idx):
-        if (idx - self.history_length + 1) >= 0:
-            return (
-                self.data[idx - self.history_length + 1 : idx + 1],
-                self.data[idx + self.periods_forward],
-            )
-        else:
-            return (
-                self.data[0 : self.history_length],
-                self.data[self.history_length - 1 + self.periods_forward],
-            )
+        return (
+            self.data[idx : idx + self.history_length],
+            self.data[
+                idx
+                + self.history_length : idx
+                + self.history_length
+                + self.periods_forward
+            ],
+        )
 
 
 class WeatherDataModule(LightningDataModule):
@@ -111,11 +126,7 @@ class WeatherDataModule(LightningDataModule):
         This method is called only from a single GPU.
         Do not use it to assign state (self.x = y).
         """
-        celled_data_path = pathlib.Path(
-            self.data_dir,
-            "celled",
-            self.dataset_name
-        )
+        celled_data_path = pathlib.Path(self.data_dir, "celled", self.dataset_name)
         if not celled_data_path.is_file():
             celled_data = create_celled_data(
                 self.data_dir,
@@ -141,14 +152,10 @@ class WeatherDataModule(LightningDataModule):
 
         # load datasets only if they're not loaded already
         if not self.data_train and not self.data_val and not self.data_test:
-            celled_data_path = pathlib.Path(
-                self.data_dir,
-                "celled",
-                self.dataset_name
-            )
+            celled_data_path = pathlib.Path(self.data_dir, "celled", self.dataset_name)
             celled_data = torch.load(celled_data_path)
             celled_data = celled_data[self.data_start : self.data_start + self.data_len]
-            train_start = 0 # self.history_len - 1
+            train_start = 0
             train_end = int(self.train_val_test_split[0] * celled_data.shape[0])
             self.data_train = Dataset_RNN(
                 celled_data,
@@ -163,11 +170,21 @@ class WeatherDataModule(LightningDataModule):
                 * celled_data.shape[0]
             )
             self.data_val = Dataset_RNN(
-                celled_data, train_end, valid_end, self.periods_forward, self.history_length, self.transforms
+                celled_data,
+                train_end,
+                valid_end,
+                self.periods_forward,
+                self.history_length,
+                self.transforms,
             )
             test_end = celled_data.shape[0]
             self.data_test = Dataset_RNN(
-                celled_data, valid_end, test_end, self.periods_forward, self.history_length, self.transforms
+                celled_data,
+                valid_end,
+                test_end,
+                self.periods_forward,
+                self.history_length,
+                self.transforms,
             )
 
     def train_dataloader(self):

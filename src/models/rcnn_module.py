@@ -33,6 +33,7 @@ class RCNNModule(LightningModule):
         n_cells_hor: int = 200,
         n_cells_ver: int = 250,
         history_length: int = 1,
+        periods_forward: int = 1,
         batch_size: int = 1,
         lr: float = 0.003,
         weight_decay: float = 0.0,
@@ -46,6 +47,7 @@ class RCNNModule(LightningModule):
         self.n_cells_hor = n_cells_hor
         self.n_cells_ver = n_cells_ver
         self.history_length = history_length
+        self.periods_forward = periods_forward
         self.batch_size = batch_size
         self.lr = lr
         self.weight_decay = weight_decay
@@ -123,7 +125,14 @@ class RCNNModule(LightningModule):
                 bias=False,
             ),
             nn.ReLU(),
-            nn.Conv2d(self.hid_size, 1, kernel_size=1, stride=1, padding=0, bias=False),
+            nn.Conv2d(
+                self.hid_size,
+                self.periods_forward,
+                kernel_size=1,
+                stride=1,
+                padding=0,
+                bias=False,
+            ),
         )
 
         self.register_buffer(
@@ -208,7 +217,9 @@ class RCNNModule(LightningModule):
             all_targets = torch.cat((all_targets, outputs[i]["targets"]), 0)
 
         # log metrics
-        all_preds = torch.squeeze(all_preds, 1)
+        print("all_preds", all_preds.shape)
+        print("all_targets", all_targets.shape)
+        #all_preds = torch.squeeze(all_preds, 1)
         train_metric = self.train_metric(all_preds, all_targets)
         self.log("train/R2", train_metric, on_epoch=True, prog_bar=True)
         pass
@@ -263,7 +274,7 @@ class RCNNModule(LightningModule):
         self.log("test/R2_mean", np.mean(r2table), on_epoch=True, prog_bar=True)
         self.log("test/R2_min", np.min(r2table), on_epoch=True, prog_bar=True)
         self.log("test/R2_max", np.max(r2table), on_epoch=True, prog_bar=True)
-        
+
         # log R2 table
         image_name = "confusion_matrix.png"
         image_path = make_heatmap(r2table, image_name)
