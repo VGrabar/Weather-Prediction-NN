@@ -33,7 +33,7 @@ class Dataset_RNN(Dataset):
         self.history_length = history_length
 
     def __len__(self):
-        return len(self.size) - self.periods_forward - self.history_length
+        return len(self.data) - self.periods_forward - self.history_length
 
     def __getitem__(self, idx):
         return (

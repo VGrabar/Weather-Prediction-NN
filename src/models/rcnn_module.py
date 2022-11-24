@@ -169,6 +169,14 @@ class RCNNModule(LightningModule):
         prev_c = self.prev_state_c
         prev_h = self.prev_state_h
         x_emb = self.embedding(x)
+        #print("prev_h", prev_h.shape)
+        #print("x", x.shape)
+        #print("x_emb", x_emb.shape)
+        #if x_emb.shape[0] < prev_h.shape[0]:
+        #    prev_h_rest = prev_h[x_emb.shape[0]:,:,:,:]
+        #    prev_h = prev_h[:x_emb.shape[0],:,:,:]
+
+
         x_and_h = torch.cat([prev_h, x_emb], dim=1)
 
         f_i = self.f_t(x_and_h)
@@ -217,9 +225,6 @@ class RCNNModule(LightningModule):
             all_targets = torch.cat((all_targets, outputs[i]["targets"]), 0)
 
         # log metrics
-        print("all_preds", all_preds.shape)
-        print("all_targets", all_targets.shape)
-        #all_preds = torch.squeeze(all_preds, 1)
         train_metric = self.train_metric(all_preds, all_targets)
         self.log("train/R2", train_metric, on_epoch=True, prog_bar=True)
         pass
@@ -239,7 +244,6 @@ class RCNNModule(LightningModule):
             all_targets = torch.cat((all_targets, outputs[i]["targets"]), 0)
 
         # log metrics
-        all_preds = torch.squeeze(all_preds, 1)
         val_metric = self.val_metric(all_preds, all_targets)
         self.log("val/R2", val_metric, on_epoch=True, prog_bar=True)
 
