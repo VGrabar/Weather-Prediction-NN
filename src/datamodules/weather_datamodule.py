@@ -171,7 +171,7 @@ class WeatherDataModule(LightningDataModule):
             )
             self.data_val = Dataset_RNN(
                 celled_data,
-                train_end,
+                train_end - self.history_length,
                 valid_end,
                 self.periods_forward,
                 self.history_length,
@@ -180,7 +180,7 @@ class WeatherDataModule(LightningDataModule):
             test_end = celled_data.shape[0]
             self.data_test = Dataset_RNN(
                 celled_data,
-                valid_end,
+                valid_end - self.history_length,
                 test_end,
                 self.periods_forward,
                 self.history_length,

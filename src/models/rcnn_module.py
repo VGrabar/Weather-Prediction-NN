@@ -156,12 +156,6 @@ class RCNNModule(LightningModule):
             ),
         )
 
-        # use separate metric instance for train, val and test step
-        # to ensure a proper reduction over the epoch
-        self.train_metric = rsquared
-        self.val_metric = rsquared
-        self.test_metric = rsquared
-
         # loss
         self.criterion = nn.MSELoss()
 
@@ -169,14 +163,6 @@ class RCNNModule(LightningModule):
         prev_c = self.prev_state_c
         prev_h = self.prev_state_h
         x_emb = self.embedding(x)
-        #print("prev_h", prev_h.shape)
-        #print("x", x.shape)
-        #print("x_emb", x_emb.shape)
-        #if x_emb.shape[0] < prev_h.shape[0]:
-        #    prev_h_rest = prev_h[x_emb.shape[0]:,:,:,:]
-        #    prev_h = prev_h[:x_emb.shape[0],:,:,:]
-
-
         x_and_h = torch.cat([prev_h, x_emb], dim=1)
 
         f_i = self.f_t(x_and_h)
@@ -225,9 +211,11 @@ class RCNNModule(LightningModule):
             all_targets = torch.cat((all_targets, outputs[i]["targets"]), 0)
 
         # log metrics
-        train_metric = self.train_metric(all_preds, all_targets)
-        self.log("train/R2", train_metric, on_epoch=True, prog_bar=True)
-        pass
+        r2table = rsquared(all_targets, all_preds, mode="mean")
+        self.log("train/R2_std", np.std(r2table), on_epoch=True, prog_bar=True)
+        self.log("train/R2", np.median(r2table), on_epoch=True, prog_bar=True)
+        self.log("train/R2_min", np.min(r2table), on_epoch=True, prog_bar=True)
+        self.log("train/R2_max", np.max(r2table), on_epoch=True, prog_bar=True)
 
     def validation_step(self, batch: Any, batch_idx: int):
         loss, preds, targets = self.step(batch)
@@ -244,8 +232,11 @@ class RCNNModule(LightningModule):
             all_targets = torch.cat((all_targets, outputs[i]["targets"]), 0)
 
         # log metrics
-        val_metric = self.val_metric(all_preds, all_targets)
-        self.log("val/R2", val_metric, on_epoch=True, prog_bar=True)
+        r2table = rsquared(all_targets, all_preds, mode="mean")
+        self.log("val/R2_std", np.std(r2table), on_epoch=True, prog_bar=True)
+        self.log("val/R2", np.median(r2table), on_epoch=True, prog_bar=True)
+        self.log("val/R2_min", np.min(r2table), on_epoch=True, prog_bar=True)
+        self.log("val/R2_max", np.max(r2table), on_epoch=True, prog_bar=True)
 
     def test_step(self, batch: Any, batch_idx: int):
         loss, preds, targets = self.step(batch)
@@ -262,26 +253,18 @@ class RCNNModule(LightningModule):
             all_targets = torch.cat((all_targets, outputs[i]["targets"]), 0)
 
         # log metrics
-        all_preds = torch.squeeze(all_preds, 1)
-        test_metric = self.test_metric(all_preds, all_targets)
-        self.log("test/R2", test_metric, on_epoch=True, prog_bar=True)
-
-        # log table
-        r2table = np.zeros((all_preds.shape[1], all_preds.shape[2]))
-        for x in range(all_preds.shape[1]):
-            for y in range(all_preds.shape[2]):
-                r2table[x][y] = self.test_metric(
-                    all_preds[:, x, y], all_targets[:, x, y]
-                )
-
-        self.log("test/R2_std", np.std(r2table), on_epoch=True, prog_bar=True)
-        self.log("test/R2_mean", np.mean(r2table), on_epoch=True, prog_bar=True)
-        self.log("test/R2_min", np.min(r2table), on_epoch=True, prog_bar=True)
-        self.log("test/R2_max", np.max(r2table), on_epoch=True, prog_bar=True)
+        print(all_preds.shape)
+        print(all_targets.shape)
+        test_r2table = rsquared(all_targets, all_preds, mode="full")
+        self.log("test/R2_std", np.std(test_r2table), on_epoch=True, prog_bar=True)
+        self.log("test/R2_median", np.median(test_r2table), on_epoch=True, prog_bar=True)
+        self.log("test/R2_min", np.min(test_r2table), on_epoch=True, prog_bar=True)
+        self.log("test/R2_max", np.max(test_r2table), on_epoch=True, prog_bar=True)
+        self.log("test/MSE", rmse(all_targets, all_preds), on_epoch=True, prog_bar=True)
 
         # log R2 table
         image_name = "confusion_matrix.png"
-        image_path = make_heatmap(r2table, image_name)
+        image_path = make_heatmap(test_r2table, image_name)
         # self.logger.experiment.log_image(image_path, name="R2 Spatial Distribution")
 
         # log plots

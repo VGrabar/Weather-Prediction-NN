@@ -36,8 +36,8 @@ original_work_dir: ${hydra:runtime.cwd}
 # path to folder with data
 data_dir: ${original_work_dir}/data/
 dataset_name: "pdsi_voronezh.csv" # "precip_belgorod_20y_40x91.csv"
-batch_size: 4
-num_epochs: 120
+batch_size: 1
+num_epochs: 200
 
 # pretty print config at the start of the run using Rich library
 print_config: True
@@ -57,10 +57,10 @@ seed: null
 
 # parameters of the model that are shared with dataloader
 n_cells_hor: 40
-n_cells_ver: 80
-history_length: 6
-periods_forward: 3
+n_cells_ver: 20
+history_length: 96
+periods_forward: 36
 
 # default name for the experiment, determines logging folder path
 # (you can overwrite this name in experiment configs)
-name: ${dataset_name}_${model._target_}_forward_${periods_forward}
+name: ${dataset_name}_${model._target_}_history_${history_length}_forward_${periods_forward}
