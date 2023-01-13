@@ -12,7 +12,7 @@ time_col: "date"
 event_col: "val"
 x_col: "x"
 y_col: "y"
-train_val_test_split: [0.6, 0.2, 0.2]
+train_val_test_split: [0.7, 0.3, 0.3]
 periods_forward: ${periods_forward}
 history_length: ${history_length}
 data_start: 0

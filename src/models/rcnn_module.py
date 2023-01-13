@@ -8,6 +8,7 @@ from torch.autograd import Variable
 
 from src.models.components.conv_block import ConvBlock
 from src.utils.metrics import rmse, rsquared, smape
+from sklearn.metrics import r2_score
 from src.utils.plotting import make_heatmap, make_pred_vs_target_plot
 
 
@@ -194,6 +195,8 @@ class RCNNModule(LightningModule):
 
     def training_step(self, batch: Any, batch_idx: int):
         loss, preds, targets = self.step(batch)
+        print(batch[0])
+        print(targets)
         self.log("train/loss", loss, on_step=False, on_epoch=True, prog_bar=True)
 
         # we can return here dict with any tensors
@@ -238,6 +241,26 @@ class RCNNModule(LightningModule):
         self.log("val/R2_min", np.min(r2table), on_epoch=True, prog_bar=True)
         self.log("val/R2_max", np.max(r2table), on_epoch=True, prog_bar=True)
 
+        # log curves
+        mse_convlstm = []
+        r2_convlstm = []
+        horizon = self.periods_forward
+        print(all_preds.shape)
+        print(all_targets.shape)
+        periods = [i for i in range(1, horizon + 1)]
+
+        for i in range(1, horizon + 1):
+            mse_period = ((all_targets[:i] - all_preds[:i]) ** 2).mean()
+            mse_convlstm.append(mse_period)
+            mean_predicted = np.mean(all_preds[:i], axis=(1, 2))
+            mean_true = np.mean(all_targets[:i], axis=(1, 2))
+            r2_convlstm.append(r2_score(mean_true, mean_predicted))
+
+        self.log_curve(
+            f"mse", horizon, mse_convlstm, on_epoch=True
+        )  # step=self.trainer.current_epoch)
+        self.log_curve(f"r2", horizon, r2_convlstm, on_epoch=True)
+
     def test_step(self, batch: Any, batch_idx: int):
         loss, preds, targets = self.step(batch)
         self.log("test/loss", loss, on_step=False, on_epoch=True, prog_bar=True)
@@ -257,7 +280,9 @@ class RCNNModule(LightningModule):
         print(all_targets.shape)
         test_r2table = rsquared(all_targets, all_preds, mode="full")
         self.log("test/R2_std", np.std(test_r2table), on_epoch=True, prog_bar=True)
-        self.log("test/R2_median", np.median(test_r2table), on_epoch=True, prog_bar=True)
+        self.log(
+            "test/R2_median", np.median(test_r2table), on_epoch=True, prog_bar=True
+        )
         self.log("test/R2_min", np.min(test_r2table), on_epoch=True, prog_bar=True)
         self.log("test/R2_max", np.max(test_r2table), on_epoch=True, prog_bar=True)
         self.log("test/MSE", rmse(all_targets, all_preds), on_epoch=True, prog_bar=True)
