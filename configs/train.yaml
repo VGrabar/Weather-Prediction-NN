@@ -4,7 +4,7 @@
 defaults:
   - _self_
   - datamodule: weather.yaml
-  - model: rcnn.yaml
+  - model: conv1d.yaml
   - callbacks: default.yaml
   - logger: comet.yaml # set logger here or use command line (e.g. `python train.py logger=tensorboard`)
   - trainer: default.yaml
