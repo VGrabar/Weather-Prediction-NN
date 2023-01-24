@@ -40,7 +40,7 @@ class Conv1dModule(LightningModule):
         lr: float = 0.003,
         weight_decay: float = 0.0,
     ):
-        super(self.__class__, self).__init__()
+        super(Conv1dModule, self).__init__()
 
         # this line allows to access init params with 'self.hparams' attribute
         # it also ensures init params will be stored in ckpt
@@ -56,13 +56,13 @@ class Conv1dModule(LightningModule):
 
 
         self.conv1x1 = nn.Conv2d(
-                self.batch_size,
+                self.history_length,
                 self.periods_forward,
                 kernel_size=1,
                 stride=1,
                 padding=0,
                 bias=False,
-            ),
+            )
 
         # loss
         self.criterion = nn.MSELoss()
@@ -142,6 +142,9 @@ class Conv1dModule(LightningModule):
         for i in range(1, len(outputs)):
             all_preds = torch.cat((all_preds, outputs[i]["preds"]), 0)
             all_targets = torch.cat((all_targets, outputs[i]["targets"]), 0)
+        
+        print(all_preds.shape)
+        print(all_targets.shape)
 
         # log metrics
         test_r2table = rsquared(all_targets, all_preds, mode="full")
@@ -161,7 +164,7 @@ class Conv1dModule(LightningModule):
             
             preds_i = all_preds[:, :i, :, :]
             targets_i = all_targets[:, :i, :, :]
-            mse_conv.append(rmse(preds_i, targets_i))
+            mse_conv.append(rmse(preds_i, targets_i).item())
             mean_preds = torch.mean(preds_i, axis=(2, 3))
             mean_targets = torch.mean(targets_i, axis=(2, 3))
             r2_conv.append(r2_score(mean_targets.cpu().numpy(), mean_preds.cpu().numpy()))
