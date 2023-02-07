@@ -12,6 +12,14 @@ from sklearn.metrics import r2_score
 from src.utils.plotting import make_heatmap, make_pred_vs_target_plot
 
 
+class ScaledTanh(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.c = 10.0
+    def forward(self, x):
+        output = torch.mul(torch.tanh(x), self.c)
+        return output
+
 class RCNNModule(LightningModule):
     """Example of LightningModule for MNIST classification.
 
@@ -117,15 +125,7 @@ class RCNNModule(LightningModule):
         )
 
         self.final_conv = nn.Sequential(
-            nn.Conv2d(
-                self.hid_size,
-                self.hid_size,
-                kernel_size=3,
-                stride=1,
-                padding=1,
-                bias=False,
-            ),
-            nn.ReLU(),
+            ScaledTanh(),
             nn.Conv2d(
                 self.hid_size,
                 self.periods_forward,
@@ -134,6 +134,15 @@ class RCNNModule(LightningModule):
                 padding=0,
                 bias=False,
             ),
+            #nn.Tanh(),
+            #nn.Conv2d(
+            #    self.hid_size,
+            #    self.periods_forward,
+            #    kernel_size=1,
+            #    stride=1,
+            #    padding=0,
+            #    bias=False,
+            #),
         )
 
         self.register_buffer(
@@ -195,8 +204,6 @@ class RCNNModule(LightningModule):
 
     def training_step(self, batch: Any, batch_idx: int):
         loss, preds, targets = self.step(batch)
-        print(batch[0])
-        print(targets)
         self.log("train/loss", loss, on_step=False, on_epoch=True, prog_bar=True)
 
         # we can return here dict with any tensors
@@ -219,6 +226,7 @@ class RCNNModule(LightningModule):
         self.log("train/R2", np.median(r2table), on_epoch=True, prog_bar=True)
         self.log("train/R2_min", np.min(r2table), on_epoch=True, prog_bar=True)
         self.log("train/R2_max", np.max(r2table), on_epoch=True, prog_bar=True)
+        self.log("train/MSE", rmse(all_targets, all_preds), on_epoch=True, prog_bar=True)
 
     def validation_step(self, batch: Any, batch_idx: int):
         loss, preds, targets = self.step(batch)
@@ -233,33 +241,16 @@ class RCNNModule(LightningModule):
         for i in range(1, len(outputs)):
             all_preds = torch.cat((all_preds, outputs[i]["preds"]), 0)
             all_targets = torch.cat((all_targets, outputs[i]["targets"]), 0)
-
+        
+        print(all_targets.max(), all_preds.max())
         # log metrics
         r2table = rsquared(all_targets, all_preds, mode="mean")
         self.log("val/R2_std", np.std(r2table), on_epoch=True, prog_bar=True)
         self.log("val/R2", np.median(r2table), on_epoch=True, prog_bar=True)
         self.log("val/R2_min", np.min(r2table), on_epoch=True, prog_bar=True)
         self.log("val/R2_max", np.max(r2table), on_epoch=True, prog_bar=True)
+        self.log("val/MSE", rmse(all_targets, all_preds), on_epoch=True, prog_bar=True)
 
-        # log curves
-        mse_convlstm = []
-        r2_convlstm = []
-        horizon = self.periods_forward
-        print(all_preds.shape)
-        print(all_targets.shape)
-        periods = [i for i in range(1, horizon + 1)]
-
-        for i in range(1, horizon + 1):
-            mse_period = ((all_targets[:i] - all_preds[:i]) ** 2).mean()
-            mse_convlstm.append(mse_period)
-            mean_predicted = np.mean(all_preds[:i], axis=(1, 2))
-            mean_true = np.mean(all_targets[:i], axis=(1, 2))
-            r2_convlstm.append(r2_score(mean_true, mean_predicted))
-
-        self.log_curve(
-            f"mse", horizon, mse_convlstm, on_epoch=True
-        )  # step=self.trainer.current_epoch)
-        self.log_curve(f"r2", horizon, r2_convlstm, on_epoch=True)
 
     def test_step(self, batch: Any, batch_idx: int):
         loss, preds, targets = self.step(batch)

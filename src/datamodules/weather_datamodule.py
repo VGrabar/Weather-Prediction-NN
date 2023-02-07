@@ -37,8 +37,8 @@ class Dataset_RNN(Dataset):
 
     def __getitem__(self, idx):
         return (
-            0.01*self.data[idx : idx + self.history_length],
-            0.01*self.data[
+                self.data[idx : idx + self.history_length],
+                self.data[
                 idx
                 + self.history_length : idx
                 + self.history_length
@@ -100,7 +100,8 @@ class WeatherDataModule(LightningDataModule):
         self.n_cells_hor = n_cells_hor
         self.n_cells_ver = n_cells_ver
         self.transforms = transforms.Compose(
-            [transforms.Resize((self.n_cells_hor, self.n_cells_ver))]
+            [transforms.Resize((self.n_cells_hor, self.n_cells_ver)),
+             transforms.Normalize((0.0), (1.0))]
         )
         self.time_col = time_col
         self.event_col = event_col

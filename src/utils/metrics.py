@@ -33,6 +33,7 @@ def rsquared(target, pred, mode: str = "mean"):
         target_mean = torch.mean(target, (2, 3)).cpu().numpy()
 
         r2_raw = np.zeros(pred_mean.shape[0])
+        
         for b in range(pred_mean.shape[0]):
             r2_raw[b] = r2_score(target_mean[b, :], pred_mean[b, :])
         #r2_median = np.median(r2_raw)
