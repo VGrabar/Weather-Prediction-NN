@@ -27,10 +27,15 @@ class Dataset_RNN(Dataset):
         periods_forward: int,
         history_length: int,
         transforms,
+        test_mode: False
     ):
         self.data = transforms(celled_data[start_date:end_date])
         self.periods_forward = periods_forward
         self.history_length = history_length
+        self.x_len = self.data.shape[1]
+        self.y_len = self.data.shape[2]
+        if test_mode:
+            self.data = self.data[:,int(0.25*self.x_len):int(0.75*self.x_len), int(0.25*self.y_len):int(0.75*self.y_len)]
 
     def __len__(self):
         return len(self.data) - self.periods_forward - self.history_length
@@ -165,6 +170,7 @@ class WeatherDataModule(LightningDataModule):
                 self.periods_forward,
                 self.history_length,
                 self.transforms,
+                test_mode=False,
             )
             # valid_end = int(
             #     (self.train_val_test_split[0] + self.train_val_test_split[1])
@@ -178,6 +184,7 @@ class WeatherDataModule(LightningDataModule):
                 self.periods_forward,
                 self.history_length,
                 self.transforms,
+                test_mode=False,
             )
             test_end = celled_data.shape[0]
             self.data_test = Dataset_RNN(
@@ -188,6 +195,7 @@ class WeatherDataModule(LightningDataModule):
                 self.periods_forward,
                 self.history_length,
                 self.transforms,
+                test_mode=True,
             )
 
     def train_dataloader(self):
