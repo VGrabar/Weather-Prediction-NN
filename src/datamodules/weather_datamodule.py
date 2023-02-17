@@ -1,5 +1,5 @@
 import pathlib
-from typing import Optional, Tuple
+from typing import Optional, Tuple, List
 
 import torch
 from pytorch_lightning import LightningDataModule
@@ -19,9 +19,11 @@ class Dataset_RNN(Dataset):
         history_length: number of past periods for an input,
         transforms: input data manipulations
     """
+
     def __init__(
         self,
         celled_data: torch.Tensor,
+        celled_features_list: List[torch.Tensor],
         start_date: int,
         end_date: int,
         periods_forward: int,
@@ -29,6 +31,9 @@ class Dataset_RNN(Dataset):
         transforms,
     ):
         self.data = transforms(celled_data[start_date:end_date])
+        self.features = celled_features_list
+        for feature in self.features:
+            feature = transforms(feature[start_date:end_date])
         self.periods_forward = periods_forward
         self.history_length = history_length
 
@@ -36,14 +41,15 @@ class Dataset_RNN(Dataset):
         return len(self.data) - self.periods_forward - self.history_length
 
     def __getitem__(self, idx):
+        input = self.data[idx : idx + self.history_length]
+        for feature in self.features:
+            input = torch.stack(input, feature[idx : idx + self.history_length], dim=0)
+        target = self.data[
+            idx + self.history_length : idx + self.history_length + self.periods_forward
+        ]
         return (
-            0.01*self.data[idx : idx + self.history_length],
-            0.01*self.data[
-                idx
-                + self.history_length : idx
-                + self.history_length
-                + self.periods_forward
-            ],
+            input,
+            target,
         )
 
 
@@ -83,6 +89,8 @@ class WeatherDataModule(LightningDataModule):
         history_length: int = 1,
         data_start: int = 0,
         data_len: int = 100,
+        num_of_additional_features: int = 0,
+        additional_features: Optional[List[str]] = None,
         batch_size: int = 64,
         num_workers: int = 0,
         pin_memory: bool = False,
@@ -115,6 +123,8 @@ class WeatherDataModule(LightningDataModule):
         self.history_length = history_length
         self.data_start = data_start
         self.data_len = data_len
+        self.num_of_features = num_of_additional_features + 1
+        self.additional_features = additional_features
 
         self.batch_size = batch_size
         self.num_workers = num_workers
@@ -142,6 +152,26 @@ class WeatherDataModule(LightningDataModule):
             )
             torch.save(celled_data, celled_data_path)
 
+        data_dir_geo = self.data_dir.split("pdsi")[1]
+        for feature in self.additional_features:
+            celled_feature_path = pathlib.Path(
+                self.data_dir, "celled", feature + data_dir_geo
+            )
+            if not celled_feature_path.is_file():
+                celled_feature = create_celled_data(
+                    self.data_dir,
+                    feature + data_dir_geo,
+                    self.left_border,
+                    self.down_border,
+                    self.right_border,
+                    self.up_border,
+                    self.time_col,
+                    self.event_col,
+                    self.x_col,
+                    self.y_col,
+                )
+                torch.save(celled_feature, celled_feature_path)
+
     def setup(self, stage: Optional[str] = None):
         """Load data. Set variables: `self.data_train`, `self.data_val`, `self.data_test`.
 
@@ -155,10 +185,24 @@ class WeatherDataModule(LightningDataModule):
             celled_data_path = pathlib.Path(self.data_dir, "celled", self.dataset_name)
             celled_data = torch.load(celled_data_path)
             celled_data = celled_data[self.data_start : self.data_start + self.data_len]
+            # loading features
+            celled_features_list = []
+            data_dir_geo = self.data_dir.split("pdsi")[1]
+            for feature in self.additional_features:
+                celled_feature_path = pathlib.Path(
+                    self.data_dir, "celled", feature + data_dir_geo
+                )
+                celled_feature = torch.load(celled_feature_path)
+                celled_feature = celled_feature[
+                    self.data_start : self.data_start + self.data_len
+                ]
+                celled_features_list.append(celled_feature)
+
             train_start = 0
             train_end = int(self.train_val_test_split[0] * celled_data.shape[0])
             self.data_train = Dataset_RNN(
                 celled_data,
+                celled_features_list,
                 train_start,
                 train_end,
                 self.periods_forward,
@@ -172,6 +216,7 @@ class WeatherDataModule(LightningDataModule):
             valid_end = celled_data.shape[0]
             self.data_val = Dataset_RNN(
                 celled_data,
+                celled_features_list,
                 train_end - self.history_length,
                 valid_end,
                 self.periods_forward,
@@ -181,7 +226,8 @@ class WeatherDataModule(LightningDataModule):
             test_end = celled_data.shape[0]
             self.data_test = Dataset_RNN(
                 celled_data,
-                #valid_end - self.history_length,
+                celled_features_list,
+                # valid_end - self.history_length,
                 train_end - self.history_length,
                 test_end,
                 self.periods_forward,
@@ -190,7 +236,6 @@ class WeatherDataModule(LightningDataModule):
             )
 
     def train_dataloader(self):
-
         return DataLoader(
             self.data_train,
             batch_size=self.batch_size,
