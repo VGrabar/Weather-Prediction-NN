@@ -63,4 +63,4 @@ periods_forward: 36
 
 # default name for the experiment, determines logging folder path
 # (you can overwrite this name in experiment configs)
-name: test_on_center_normalized_tanh_${dataset_name}_${model._target_}_history_${history_length}_forward_${periods_forward}
+name: mult_features_tanh_${dataset_name}_${model._target_}_history_${history_length}_forward_${periods_forward}

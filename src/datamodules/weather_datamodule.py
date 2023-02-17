@@ -50,14 +50,14 @@ class Dataset_RNN(Dataset):
         return len(self.data) - self.periods_forward - self.history_length
 
     def __getitem__(self, idx):
-        input = self.data[idx : idx + self.history_length]
+        input_tensor = self.data[idx : idx + self.history_length]
         for feature in self.features:
-            input = torch.stack(input, feature[idx : idx + self.history_length], dim=0)
+            input_tensor = torch.cat((input_tensor, feature[idx : idx + self.history_length]), dim=0)
         target = self.data[
             idx + self.history_length : idx + self.history_length + self.periods_forward
         ]
         return (
-            input,
+            input_tensor,
             target,
         )
 
@@ -119,7 +119,7 @@ class WeatherDataModule(LightningDataModule):
         self.transforms = transforms.Compose(
             [
                 transforms.Resize((self.n_cells_hor, self.n_cells_ver)),
-                transforms.Normalize((0.0), (1.0)),
+        #        transforms.Normalize((0.0), (1.0)),
             ]
         )
         self.time_col = time_col
@@ -164,7 +164,7 @@ class WeatherDataModule(LightningDataModule):
             )
             torch.save(celled_data, celled_data_path)
 
-        data_dir_geo = self.data_dir.split("pdsi")[1]
+        data_dir_geo = self.dataset_name.split("pdsi")[1]
         for feature in self.additional_features:
             celled_feature_path = pathlib.Path(
                 self.data_dir, "celled", feature + data_dir_geo
@@ -199,7 +199,7 @@ class WeatherDataModule(LightningDataModule):
             celled_data = celled_data[self.data_start : self.data_start + self.data_len]
             # loading features
             celled_features_list = []
-            data_dir_geo = self.data_dir.split("pdsi")[1]
+            data_dir_geo = self.dataset_name.split("pdsi")[1]
             for feature in self.additional_features:
                 celled_feature_path = pathlib.Path(
                     self.data_dir, "celled", feature + data_dir_geo

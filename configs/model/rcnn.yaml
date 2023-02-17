@@ -9,7 +9,6 @@ history_length: ${history_length}
 periods_forward: ${periods_forward}
 batch_size: ${batch_size}
 num_of_additional_features: 4
-additional_features: ["pr", "pet", "tmmn", "tmmx"]
 values_range: 10
 lr: 0.003
 weight_decay: 0

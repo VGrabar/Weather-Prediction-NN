@@ -268,7 +268,6 @@ class RCNNModule(LightningModule):
             all_preds = torch.cat((all_preds, outputs[i]["preds"]), 0)
             all_targets = torch.cat((all_targets, outputs[i]["targets"]), 0)
         
-        print(all_targets.max(), all_preds.max())
         # log metrics
         r2table = rsquared(all_targets, all_preds, mode="mean")
         self.log("val/R2_std", np.std(r2table), on_epoch=True, prog_bar=True)
@@ -293,8 +292,6 @@ class RCNNModule(LightningModule):
             all_targets = torch.cat((all_targets, outputs[i]["targets"]), 0)
 
         # log metrics
-        print(all_preds.shape)
-        print(all_targets.shape)
         test_r2table = rsquared(all_targets, all_preds, mode="full")
         self.log("test/R2_std", np.std(test_r2table), on_epoch=True, prog_bar=True)
         self.log(
