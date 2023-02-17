@@ -1,6 +1,8 @@
 **.csv
 **.sh
 **.ipynb
+**.npy
+**.png
 **.DS_Store
 *.pyc
 .ipynb_checkpoints/

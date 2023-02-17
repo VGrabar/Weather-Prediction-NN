@@ -1,4 +1,4 @@
-from typing import Any, List, Tuple
+from typing import Any, List
 
 import numpy as np
 import torch
@@ -13,9 +13,10 @@ from src.utils.plotting import make_heatmap, make_pred_vs_target_plot
 
 
 class ScaledTanh(nn.Module):
-    def __init__(self):
+    def __init__(self, coef: int = 10):
         super().__init__()
-        self.c = 10.0
+        self.c = coef
+
     def forward(self, x):
         output = torch.mul(torch.tanh(x), self.c)
         return output
@@ -44,6 +45,8 @@ class RCNNModule(LightningModule):
         history_length: int = 1,
         periods_forward: int = 1,
         batch_size: int = 1,
+        num_of_additional_features: int = 0,
+        values_range: int = 10,
         lr: float = 0.003,
         weight_decay: float = 0.0,
     ):
@@ -61,13 +64,16 @@ class RCNNModule(LightningModule):
         self.lr = lr
         self.weight_decay = weight_decay
 
+        self.num_of_features = num_of_additional_features + 1
+        self.tanh_coef = values_range
+
         self.emb_size = embedding_size
         self.hid_size = hidden_state_size
         self.kernel_size = kernel_size
 
         self.embedding = nn.Sequential(
             ConvBlock(
-                history_length,
+                self.num_of_features * history_length,
                 self.emb_size,
                 self.kernel_size,
                 stride=1,
@@ -125,7 +131,7 @@ class RCNNModule(LightningModule):
         )
 
         self.final_conv = nn.Sequential(
-            ScaledTanh(),
+            ScaledTanh(self.tanh_coef),
             nn.Conv2d(
                 self.hid_size,
                 self.periods_forward,
@@ -144,6 +150,26 @@ class RCNNModule(LightningModule):
             #    bias=False,
             #),
         )
+
+        # self.final_conv = nn.Sequential(
+        #    nn.Conv2d(
+        #        self.hid_size,
+        #         self.hid_size,
+        #         kernel_size=3,
+        #         stride=1,
+        #         padding=1,
+        #         bias=False,
+        #     ),
+        #     nn.ReLU(),
+        #     nn.Conv2d(
+        #         self.hid_size,
+        #         self.periods_forward,
+        #         kernel_size=1,
+        #         stride=1,
+        #         padding=0,
+        #         bias=False,
+        #     ),
+        # )
 
         self.register_buffer(
             "prev_state_h",
