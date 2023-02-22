@@ -29,7 +29,7 @@ class Dataset_RNN(Dataset):
         periods_forward: int,
         history_length: int,
         transforms,
-        test_mode: False,
+        mode,
     ):
         self.data = transforms(celled_data[start_date:end_date])
         self.features = celled_features_list
@@ -37,14 +37,9 @@ class Dataset_RNN(Dataset):
             feature = transforms(feature[start_date:end_date])
         self.periods_forward = periods_forward
         self.history_length = history_length
-        self.x_len = self.data.shape[1]
-        self.y_len = self.data.shape[2]
-        if test_mode:
-            self.data = self.data[
-                :,
-                int(0.25 * self.x_len) : int(0.75 * self.x_len),
-                int(0.25 * self.y_len) : int(0.75 * self.y_len),
-            ]
+        self.mode = mode
+        # bins for pdsi
+        self.boundaries = torch.tensor([-4, -3, -2, -1, 1, 2, 3, 4])
 
     def __len__(self):
         return len(self.data) - self.periods_forward - self.history_length
@@ -52,10 +47,15 @@ class Dataset_RNN(Dataset):
     def __getitem__(self, idx):
         input_tensor = self.data[idx : idx + self.history_length]
         for feature in self.features:
-            input_tensor = torch.cat((input_tensor, feature[idx : idx + self.history_length]), dim=0)
+            input_tensor = torch.cat(
+                (input_tensor, feature[idx : idx + self.history_length]), dim=0
+            )
         target = self.data[
             idx + self.history_length : idx + self.history_length + self.periods_forward
         ]
+        if self.mode == "classificator":
+            target = torch.bucketize(target, self.boundaries)
+
         return (
             input_tensor,
             target,
@@ -81,6 +81,7 @@ class WeatherDataModule(LightningDataModule):
 
     def __init__(
         self,
+        mode: str = "regressor",
         data_dir: str = "data",
         dataset_name: str = "dataset_name",
         left_border: int = 0,
@@ -108,6 +109,7 @@ class WeatherDataModule(LightningDataModule):
 
         # this line allows to access init params with 'self.hparams' attribute
         self.save_hyperparameters(logger=False)
+        self.mode = mode
         self.data_dir = data_dir
         self.dataset_name = dataset_name
         self.left_border = left_border
@@ -119,7 +121,7 @@ class WeatherDataModule(LightningDataModule):
         self.transforms = transforms.Compose(
             [
                 transforms.Resize((self.n_cells_hor, self.n_cells_ver)),
-        #        transforms.Normalize((0.0), (1.0)),
+                #        transforms.Normalize((0.0), (1.0)),
             ]
         )
         self.time_col = time_col
@@ -220,7 +222,7 @@ class WeatherDataModule(LightningDataModule):
                 self.periods_forward,
                 self.history_length,
                 self.transforms,
-                test_mode=False,
+                self.mode,
             )
             # valid_end = int(
             #     (self.train_val_test_split[0] + self.train_val_test_split[1])
@@ -235,19 +237,18 @@ class WeatherDataModule(LightningDataModule):
                 self.periods_forward,
                 self.history_length,
                 self.transforms,
-                test_mode=False,
+                self.mode,
             )
             test_end = celled_data.shape[0]
             self.data_test = Dataset_RNN(
                 celled_data,
                 celled_features_list,
-                # valid_end - self.history_length,
                 train_end - self.history_length,
                 test_end,
                 self.periods_forward,
                 self.history_length,
                 self.transforms,
-                test_mode=True,
+                self.mode,
             )
 
     def train_dataloader(self):

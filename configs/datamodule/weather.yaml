@@ -1,5 +1,6 @@
 _target_: src.datamodules.weather_datamodule.WeatherDataModule
 
+mode: "regressor" # or "classificator"
 data_dir: ${data_dir}  # data_dir is specified in config.yaml
 dataset_name: ${dataset_name}  # dataset_name is specified in config.yaml
 left_border: 0

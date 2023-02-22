@@ -21,6 +21,7 @@ class ScaledTanh(nn.Module):
         output = torch.mul(torch.tanh(x), self.c)
         return output
 
+
 class RCNNModule(LightningModule):
     """Example of LightningModule for MNIST classification.
 
@@ -37,6 +38,7 @@ class RCNNModule(LightningModule):
 
     def __init__(
         self,
+        mode: str = "regressor",
         embedding_size: int = 16,
         hidden_state_size: int = 32,
         kernel_size: int = 3,
@@ -66,6 +68,8 @@ class RCNNModule(LightningModule):
 
         self.num_of_features = num_of_additional_features + 1
         self.tanh_coef = values_range
+        # number of bins for pdsi
+        self.num_class = 9
 
         self.emb_size = embedding_size
         self.hid_size = hidden_state_size
@@ -131,7 +135,6 @@ class RCNNModule(LightningModule):
         )
 
         self.final_conv = nn.Sequential(
-            ScaledTanh(self.tanh_coef),
             nn.Conv2d(
                 self.hid_size,
                 self.periods_forward,
@@ -140,36 +143,29 @@ class RCNNModule(LightningModule):
                 padding=0,
                 bias=False,
             ),
-            #nn.Tanh(),
-            #nn.Conv2d(
+            ScaledTanh(self.tanh_coef),
+            # nn.Tanh(),
+            # nn.Conv2d(
             #    self.hid_size,
             #    self.periods_forward,
             #    kernel_size=1,
             #    stride=1,
             #    padding=0,
             #    bias=False,
-            #),
+            # ),
         )
 
-        # self.final_conv = nn.Sequential(
-        #    nn.Conv2d(
-        #        self.hid_size,
-        #         self.hid_size,
-        #         kernel_size=3,
-        #         stride=1,
-        #         padding=1,
-        #         bias=False,
-        #     ),
-        #     nn.ReLU(),
-        #     nn.Conv2d(
-        #         self.hid_size,
-        #         self.periods_forward,
-        #         kernel_size=1,
-        #         stride=1,
-        #         padding=0,
-        #         bias=False,
-        #     ),
-        # )
+        self.final_classify = nn.Sequential(
+            nn.Conv2d(
+                self.hid_size,
+                self.num_class,
+                kernel_size=1,
+                stride=1,
+                padding=0,
+                bias=False,
+            ),
+            nn.Softmax(),
+        )
 
         self.register_buffer(
             "prev_state_h",
@@ -192,8 +188,14 @@ class RCNNModule(LightningModule):
             ),
         )
 
+        self.mode = mode
         # loss
-        self.criterion = nn.MSELoss()
+        if self.mode == "regressor":
+            self.criterion = nn.MSELoss()
+            self.metric = "MSE"
+        else:
+            self.criterion = nn.CrossEntropyLoss()
+            self.metric = "CrossEntropy"
 
     def forward(self, x: torch.Tensor):
         prev_c = self.prev_state_c
@@ -212,7 +214,10 @@ class RCNNModule(LightningModule):
         assert prev_h.shape == next_h.shape
         assert prev_c.shape == next_c.shape
 
-        prediction = self.final_conv(next_h)
+        if self.mode == "regressor":
+            prediction = self.final_conv(next_h)
+        else:
+            prediction = self.final_classify(next_h)
         self.prev_state_c = next_c
         self.prev_state_h = next_h
 
@@ -223,6 +228,21 @@ class RCNNModule(LightningModule):
         preds = self.forward(x)
         loss = self.criterion(preds, y)
         return loss, preds, y
+
+    def rolling_step(self, batch: Any):
+        x, y = batch
+        # x -> B*Hist*W*H or B*(Hist*Feat)*W*H
+        # pdsi is first feature in tensor
+        x = x[:, : self.history_length, :, :]
+        rolling = torch.mean(x, dim=1)
+        rolling_forecast = rolling[:, None, :, :]
+
+        for i in range(1, self.periods_forward):
+            x = torch.cat((x[:, 1:, :, :], rolling[:, None, :, :]), dim=1)
+            rolling = torch.mean(x, dim=1)
+            rolling_forecast = torch.cat(rolling_forecast, rolling[:, None, :, :])
+
+        return rolling_forecast
 
     def on_after_backward(self) -> None:
         self.prev_state_c.detach_()
@@ -247,12 +267,19 @@ class RCNNModule(LightningModule):
             all_targets = torch.cat((all_targets, outputs[i]["targets"]), 0)
 
         # log metrics
-        r2table = rsquared(all_targets, all_preds, mode="mean")
-        self.log("train/R2_std", np.std(r2table), on_epoch=True, prog_bar=True)
-        self.log("train/R2", np.median(r2table), on_epoch=True, prog_bar=True)
-        self.log("train/R2_min", np.min(r2table), on_epoch=True, prog_bar=True)
-        self.log("train/R2_max", np.max(r2table), on_epoch=True, prog_bar=True)
-        self.log("train/MSE", rmse(all_targets, all_preds), on_epoch=True, prog_bar=True)
+        # r2table = rsquared(all_targets, all_preds, mode="mean")
+        # self.log("train/R2_std", np.std(r2table), on_epoch=True, prog_bar=True)
+        # self.log("train/R2", np.median(r2table), on_epoch=True, prog_bar=True)
+        # self.log("train/R2_min", np.min(r2table), on_epoch=True, prog_bar=True)
+        # self.log("train/R2_max", np.max(r2table), on_epoch=True, prog_bar=True)
+
+        # add metric for classify
+        self.log(
+            "train/" + self.metric_name,
+            self.criterion(all_targets, all_preds),
+            on_epoch=True,
+            prog_bar=True,
+        )
 
     def validation_step(self, batch: Any, batch_idx: int):
         loss, preds, targets = self.step(batch)
@@ -267,58 +294,78 @@ class RCNNModule(LightningModule):
         for i in range(1, len(outputs)):
             all_preds = torch.cat((all_preds, outputs[i]["preds"]), 0)
             all_targets = torch.cat((all_targets, outputs[i]["targets"]), 0)
-        
-        # log metrics
-        r2table = rsquared(all_targets, all_preds, mode="mean")
-        self.log("val/R2_std", np.std(r2table), on_epoch=True, prog_bar=True)
-        self.log("val/R2", np.median(r2table), on_epoch=True, prog_bar=True)
-        self.log("val/R2_min", np.min(r2table), on_epoch=True, prog_bar=True)
-        self.log("val/R2_max", np.max(r2table), on_epoch=True, prog_bar=True)
-        self.log("val/MSE", rmse(all_targets, all_preds), on_epoch=True, prog_bar=True)
 
+        # log metrics
+        # r2table = rsquared(all_targets, all_preds, mode="mean")
+        # self.log("val/R2_std", np.std(r2table), on_epoch=True, prog_bar=True)
+        # self.log("val/R2", np.median(r2table), on_epoch=True, prog_bar=True)
+        # self.log("val/R2_min", np.min(r2table), on_epoch=True, prog_bar=True)
+        # self.log("val/R2_max", np.max(r2table), on_epoch=True, prog_bar=True)
+        self.log(
+            "val/" + self.metric_name,
+            self.criterion(all_targets, all_preds),
+            on_epoch=True,
+            prog_bar=True,
+        )
 
     def test_step(self, batch: Any, batch_idx: int):
         loss, preds, targets = self.step(batch)
+        rolling = self.rolling_step(batch)
         self.log("test/loss", loss, on_step=False, on_epoch=True, prog_bar=True)
 
-        return {"loss": loss, "preds": preds, "targets": targets}
+        return {"loss": loss, "preds": preds, "targets": targets, "rolling": rolling}
 
     def test_epoch_end(self, outputs: List[Any]):
         all_preds = outputs[0]["preds"]
         all_targets = outputs[0]["targets"]
+        all_rollings = outputs[0]["rolling"]
 
         for i in range(1, len(outputs)):
             all_preds = torch.cat((all_preds, outputs[i]["preds"]), 0)
             all_targets = torch.cat((all_targets, outputs[i]["targets"]), 0)
+            all_rollings = torch.cat((all_rollings, outputs[i]["rolling"]), 0)
 
         # log metrics
-        test_r2table = rsquared(all_targets, all_preds, mode="full")
-        self.log("test/R2_std", np.std(test_r2table), on_epoch=True, prog_bar=True)
+        # test_r2table = rsquared(all_targets, all_preds, mode="full")
+        # self.log("test/R2_std", np.std(test_r2table), on_epoch=True, prog_bar=True)
+        # self.log(
+        #     "test/R2_median", np.median(test_r2table), on_epoch=True, prog_bar=True
+        # )
+        # self.log("test/R2_min", np.min(test_r2table), on_epoch=True, prog_bar=True)
+        # self.log("test/R2_max", np.max(test_r2table), on_epoch=True, prog_bar=True)
         self.log(
-            "test/R2_median", np.median(test_r2table), on_epoch=True, prog_bar=True
+            "test/" + self.metric,
+            self.criterion(all_targets, all_preds),
+            on_epoch=True,
+            prog_bar=True,
         )
-        self.log("test/R2_min", np.min(test_r2table), on_epoch=True, prog_bar=True)
-        self.log("test/R2_max", np.max(test_r2table), on_epoch=True, prog_bar=True)
-        self.log("test/MSE", rmse(all_targets, all_preds), on_epoch=True, prog_bar=True)
+        if self.mode == "classicator":
+            pass
+        elif self.mode == "regressor":
+            self.log(
+                "test/rolling_MSE",
+                self.criterion(all_rollings, all_targets),
+                on_epoch=True,
+                prog_bar=True,
+            )
 
+        # logging figures and graphs
         # log R2 table
-        image_name = "confusion_matrix.png"
-        image_path = make_heatmap(test_r2table, image_name)
+        # image_path = make_heatmap(test_r2table, image_name="confusion_matrix.png")
         # self.logger.experiment.log_image(image_path, name="R2 Spatial Distribution")
 
         # log plots
-        image_name = "preds_targets.png"
-        make_pred_vs_target_plot(
-            all_preds,
-            all_targets,
-            title="Forecasting",
-            size=(8, 6),
-            xlabel="periods",
-            xlabel_rotate=45,
-            ylabel="Value",
-            ylabel_rotate=0,
-            filename=image_name,
-        )
+        # make_pred_vs_target_plot(
+        #     all_preds,
+        #     all_targets,
+        #     title="Forecasting",
+        #     size=(8, 6),
+        #     xlabel="periods",
+        #     xlabel_rotate=45,
+        #     ylabel="Value",
+        #     ylabel_rotate=0,
+        #     filename= "preds_targets.png",
+        # )
         # self.logger.Experiment.log_image("img", image_name, 0)
 
     def on_epoch_end(self):
