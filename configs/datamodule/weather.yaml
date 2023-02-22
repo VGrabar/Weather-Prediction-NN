@@ -17,9 +17,9 @@ train_val_test_split: [0.7, 0.3, 0.3]
 periods_forward: ${periods_forward}
 history_length: ${history_length}
 data_start: 0
-data_len: 500
-num_of_additional_features: 4
-additional_features: ["pr", "pet", "tmmn", "tmmx"]
+data_len: 700
+num_of_additional_features: 0
+additional_features: [] # ["pr", "pet", "tmmn", "tmmx"]
 batch_size: ${batch_size}
 num_workers: 0
 pin_memory: False

@@ -37,7 +37,7 @@ original_work_dir: ${hydra:runtime.cwd}
 data_dir: ${original_work_dir}/data/
 dataset_name: "pdsi_Belgorod_with_neighb.csv"  #"pdsi_voronezh.csv" # "precip_belgorod_20y_40x91.csv"
 batch_size: 1
-num_epochs: 90
+num_epochs: 150
 
 # pretty print config at the start of the run using Rich library
 print_config: True

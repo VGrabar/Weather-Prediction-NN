@@ -192,10 +192,10 @@ class RCNNModule(LightningModule):
         # loss
         if self.mode == "regressor":
             self.criterion = nn.MSELoss()
-            self.metric = "MSE"
+            self.metric_name = "MSE"
         else:
             self.criterion = nn.CrossEntropyLoss()
-            self.metric = "CrossEntropy"
+            self.metric_name = "CrossEntropy"
 
     def forward(self, x: torch.Tensor):
         prev_c = self.prev_state_c
@@ -240,7 +240,7 @@ class RCNNModule(LightningModule):
         for i in range(1, self.periods_forward):
             x = torch.cat((x[:, 1:, :, :], rolling[:, None, :, :]), dim=1)
             rolling = torch.mean(x, dim=1)
-            rolling_forecast = torch.cat(rolling_forecast, rolling[:, None, :, :])
+            rolling_forecast = torch.cat((rolling_forecast, rolling[:, None, :, :]), dim=1)
 
         return rolling_forecast
 
@@ -334,7 +334,7 @@ class RCNNModule(LightningModule):
         # self.log("test/R2_min", np.min(test_r2table), on_epoch=True, prog_bar=True)
         # self.log("test/R2_max", np.max(test_r2table), on_epoch=True, prog_bar=True)
         self.log(
-            "test/" + self.metric,
+            "test/" + self.metric_name,
             self.criterion(all_targets, all_preds),
             on_epoch=True,
             prog_bar=True,
