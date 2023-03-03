@@ -39,7 +39,8 @@ class Dataset_RNN(Dataset):
         self.history_length = history_length
         self.mode = mode
         # bins for pdsi
-        self.boundaries = torch.tensor([-4, -3, -2, -1, 1, 2, 3, 4])
+        #self.boundaries = torch.tensor([-4, -3, -2, -1, 1, 2, 3, 4])
+        self.boundaries = torch.tensor([-2])
 
     def __len__(self):
         return len(self.data) - self.periods_forward - self.history_length

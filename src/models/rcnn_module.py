@@ -1,14 +1,15 @@
+import sys
 from typing import Any, List
 
 import numpy as np
 import torch
 import torch.nn as nn
 from pytorch_lightning import LightningModule
+from sklearn.metrics import r2_score
 from torch.autograd import Variable
 
 from src.models.components.conv_block import ConvBlock
 from src.utils.metrics import rmse, rsquared, smape
-from sklearn.metrics import r2_score
 from src.utils.plotting import make_heatmap, make_pred_vs_target_plot
 
 
@@ -38,16 +39,19 @@ class RCNNModule(LightningModule):
 
     def __init__(
         self,
-        mode: str = "regressor",
+        mode: str = "regression",
         embedding_size: int = 16,
         hidden_state_size: int = 32,
         kernel_size: int = 3,
+        groups: int = 1,
+        dilation: int = 1,
         n_cells_hor: int = 200,
         n_cells_ver: int = 250,
         history_length: int = 1,
         periods_forward: int = 1,
         batch_size: int = 1,
         num_of_additional_features: int = 0,
+        num_classes: int = 2,
         values_range: int = 10,
         lr: float = 0.003,
         weight_decay: float = 0.0,
@@ -69,11 +73,13 @@ class RCNNModule(LightningModule):
         self.num_of_features = num_of_additional_features + 1
         self.tanh_coef = values_range
         # number of bins for pdsi
-        self.num_class = 9
+        self.num_class = num_classes
 
         self.emb_size = embedding_size
         self.hid_size = hidden_state_size
         self.kernel_size = kernel_size
+        self.dilation = dilation
+        self.groups = groups
 
         self.embedding = nn.Sequential(
             ConvBlock(
@@ -82,6 +88,8 @@ class RCNNModule(LightningModule):
                 self.kernel_size,
                 stride=1,
                 padding=self.kernel_size // 2,
+                dilation=self.dilation,
+                groups=self.groups,
             ),
             nn.ReLU(),
             ConvBlock(
@@ -164,7 +172,7 @@ class RCNNModule(LightningModule):
                 padding=0,
                 bias=False,
             ),
-            nn.Softmax(),
+            nn.Softmax(dim=1),
         )
 
         self.register_buffer(
@@ -190,7 +198,7 @@ class RCNNModule(LightningModule):
 
         self.mode = mode
         # loss
-        if self.mode == "regressor":
+        if self.mode == "regression":
             self.criterion = nn.MSELoss()
             self.metric_name = "MSE"
         else:
@@ -214,10 +222,11 @@ class RCNNModule(LightningModule):
         assert prev_h.shape == next_h.shape
         assert prev_c.shape == next_c.shape
 
-        if self.mode == "regressor":
+        if self.mode == "regression":
             prediction = self.final_conv(next_h)
-        else:
+        elif self.mode == "classification":
             prediction = self.final_classify(next_h)
+            print(prediction.shape)
         self.prev_state_c = next_c
         self.prev_state_h = next_h
 

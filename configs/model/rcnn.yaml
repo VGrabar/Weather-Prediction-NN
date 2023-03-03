@@ -1,15 +1,22 @@
 _target_: src.models.rcnn_module.RCNNModule
 
-mode: "regressor" # or "classificator"
+mode: "classification" # or "classification" or "regression"
 embedding_size: 16
 hidden_state_size: 32
 kernel_size: 3
+groups: 1
+dilation: 1
 n_cells_hor: ${n_cells_hor}
 n_cells_ver: ${n_cells_ver}
 history_length: ${history_length}
 periods_forward: ${periods_forward}
 batch_size: ${batch_size}
+<<<<<<< HEAD
 num_of_additional_features: 0
+=======
+num_of_additional_features: 4
+num_classes: 2
+>>>>>>> 5c798ab (classification)
 values_range: 10
 lr: 0.003
 weight_decay: 0
