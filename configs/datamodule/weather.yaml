@@ -18,6 +18,7 @@ periods_forward: ${periods_forward}
 history_length: ${history_length}
 data_start: 0
 data_len: 700
+feature_to_predict: "pdsi"
 num_of_additional_features: 0
 additional_features: [] # ["pr", "pet", "tmmn", "tmmx"]
 batch_size: ${batch_size}

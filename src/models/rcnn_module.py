@@ -5,7 +5,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 from pytorch_lightning import LightningModule
-from sklearn.metrics import r2_score
+from sklearn.metrics import r2_score, roc_auc_score
 from torch.autograd import Variable
 
 from src.models.components.conv_block import ConvBlock
@@ -164,13 +164,14 @@ class RCNNModule(LightningModule):
         )
 
         self.final_classify = nn.Sequential(
-            nn.Conv2d(
+            ConvBlock(
                 self.hid_size,
                 self.num_class,
-                kernel_size=1,
+                kernel_size=3,
                 stride=1,
-                padding=0,
-                bias=False,
+                padding=1,
+                dilation=1,
+                groups=1,
             ),
             nn.Softmax(dim=1),
         )
@@ -200,10 +201,11 @@ class RCNNModule(LightningModule):
         # loss
         if self.mode == "regression":
             self.criterion = nn.MSELoss()
-            self.metric_name = "MSE"
+            self.loss_name = "MSE"
         else:
             self.criterion = nn.CrossEntropyLoss()
-            self.metric_name = "CrossEntropy"
+            self.loss_name = "CrossEntropy"
+            self.metric_name = "RocAuc"
 
     def forward(self, x: torch.Tensor):
         prev_c = self.prev_state_c
@@ -227,6 +229,7 @@ class RCNNModule(LightningModule):
         elif self.mode == "classification":
             prediction = self.final_classify(next_h)
             print(prediction.shape)
+            print("pred", prediction)
         self.prev_state_c = next_c
         self.prev_state_h = next_h
 
@@ -268,11 +271,17 @@ class RCNNModule(LightningModule):
 
     def training_epoch_end(self, outputs: List[Any]):
         # `outputs` is a list of dicts returned from `training_step()`
-        all_preds = outputs[0]["preds"]
         all_targets = outputs[0]["targets"]
+        if self.mode == "regression":
+            all_preds = outputs[0]["preds"]
+        elif self.mode == "classification":
+            all_preds = outputs[0]["preds"][1]
 
         for i in range(1, len(outputs)):
-            all_preds = torch.cat((all_preds, outputs[i]["preds"]), 0)
+            if self.mode == "regression":
+                all_preds = torch.cat((all_preds, outputs[i]["preds"]), 0)
+            elif self.mode == "classification":
+                all_preds = torch.cat((all_preds, outputs[i]["preds"][1]), 0)
             all_targets = torch.cat((all_targets, outputs[i]["targets"]), 0)
 
         # log metrics
@@ -284,11 +293,18 @@ class RCNNModule(LightningModule):
 
         # add metric for classify
         self.log(
-            "train/" + self.metric_name,
+            "train/" + self.loss_name,
             self.criterion(all_targets, all_preds),
             on_epoch=True,
             prog_bar=True,
         )
+        if self.mode == "classification":
+            self.log(
+                "val/" + self.metric_name,
+                roc_auc_score(all_targets, all_preds),
+                on_epoch=True,
+                prog_bar=True,
+            )
 
     def validation_step(self, batch: Any, batch_idx: int):
         loss, preds, targets = self.step(batch)
@@ -297,11 +313,18 @@ class RCNNModule(LightningModule):
         return {"loss": loss, "preds": preds, "targets": targets}
 
     def validation_epoch_end(self, outputs: List[Any]):
-        all_preds = outputs[0]["preds"]
+        
         all_targets = outputs[0]["targets"]
+        if self.mode == "regression":
+            all_preds = outputs[0]["preds"]
+        elif self.mode == "classification":
+            all_preds = outputs[0]["preds"][1]
 
         for i in range(1, len(outputs)):
-            all_preds = torch.cat((all_preds, outputs[i]["preds"]), 0)
+            if self.mode == "regression":
+                all_preds = torch.cat((all_preds, outputs[i]["preds"]), 0)
+            elif self.mode == "classification":
+                all_preds = torch.cat((all_preds, outputs[i]["preds"][1]), 0)
             all_targets = torch.cat((all_targets, outputs[i]["targets"]), 0)
 
         # log metrics
@@ -311,11 +334,18 @@ class RCNNModule(LightningModule):
         # self.log("val/R2_min", np.min(r2table), on_epoch=True, prog_bar=True)
         # self.log("val/R2_max", np.max(r2table), on_epoch=True, prog_bar=True)
         self.log(
-            "val/" + self.metric_name,
+            "val/" + self.loss_name,
             self.criterion(all_targets, all_preds),
             on_epoch=True,
             prog_bar=True,
         )
+        if self.mode == "classification":
+            self.log(
+                "val/" + self.metric_name,
+                roc_auc_score(all_targets, all_preds),
+                on_epoch=True,
+                prog_bar=True,
+            )
 
     def test_step(self, batch: Any, batch_idx: int):
         loss, preds, targets = self.step(batch)
@@ -325,12 +355,19 @@ class RCNNModule(LightningModule):
         return {"loss": loss, "preds": preds, "targets": targets, "rolling": rolling}
 
     def test_epoch_end(self, outputs: List[Any]):
-        all_preds = outputs[0]["preds"]
+        
         all_targets = outputs[0]["targets"]
         all_rollings = outputs[0]["rolling"]
+        if self.mode == "regression":
+            all_preds = outputs[0]["preds"]
+        elif self.mode == "classification":
+            all_preds = outputs[0]["preds"][1]
 
         for i in range(1, len(outputs)):
-            all_preds = torch.cat((all_preds, outputs[i]["preds"]), 0)
+            if self.mode == "regression":
+                all_preds = torch.cat((all_preds, outputs[i]["preds"]), 0)
+            elif self.mode == "classification":
+                all_preds = torch.cat((all_preds, outputs[i]["preds"][1]), 0)
             all_targets = torch.cat((all_targets, outputs[i]["targets"]), 0)
             all_rollings = torch.cat((all_rollings, outputs[i]["rolling"]), 0)
 
@@ -343,17 +380,22 @@ class RCNNModule(LightningModule):
         # self.log("test/R2_min", np.min(test_r2table), on_epoch=True, prog_bar=True)
         # self.log("test/R2_max", np.max(test_r2table), on_epoch=True, prog_bar=True)
         self.log(
-            "test/" + self.metric_name,
+            "test/" + self.loss_name,
             self.criterion(all_targets, all_preds),
             on_epoch=True,
             prog_bar=True,
         )
-        if self.mode == "classicator":
-            pass
-        elif self.mode == "regressor":
+        if self.mode == "regression":
             self.log(
                 "test/rolling_MSE",
                 self.criterion(all_rollings, all_targets),
+                on_epoch=True,
+                prog_bar=True,
+            )
+        if self.mode == "classification":
+            self.log(
+                "val/" + self.metric_name,
+                roc_auc_score(all_targets, all_preds),
                 on_epoch=True,
                 prog_bar=True,
             )

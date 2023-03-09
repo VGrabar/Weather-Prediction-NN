@@ -57,6 +57,7 @@ class Dataset_RNN(Dataset):
         if self.mode == "classificator":
             target = torch.bucketize(target, self.boundaries)
 
+        print(target)
         return (
             input_tensor,
             target,
@@ -100,6 +101,7 @@ class WeatherDataModule(LightningDataModule):
         history_length: int = 1,
         data_start: int = 0,
         data_len: int = 100,
+        feature_to_predict: str = "pdsi",
         num_of_additional_features: int = 0,
         additional_features: Optional[List[str]] = None,
         batch_size: int = 64,
@@ -138,6 +140,7 @@ class WeatherDataModule(LightningDataModule):
         self.history_length = history_length
         self.data_start = data_start
         self.data_len = data_len
+        self.feature_to_predict = feature_to_predict
         self.num_of_features = num_of_additional_features + 1
         self.additional_features = additional_features
 
@@ -167,7 +170,7 @@ class WeatherDataModule(LightningDataModule):
             )
             torch.save(celled_data, celled_data_path)
 
-        data_dir_geo = self.dataset_name.split("pdsi")[1]
+        data_dir_geo = self.dataset_name.split(self.feature_to_predict)[1]
         for feature in self.additional_features:
             celled_feature_path = pathlib.Path(
                 self.data_dir, "celled", feature + data_dir_geo
@@ -202,7 +205,7 @@ class WeatherDataModule(LightningDataModule):
             celled_data = celled_data[self.data_start : self.data_start + self.data_len]
             # loading features
             celled_features_list = []
-            data_dir_geo = self.dataset_name.split("pdsi")[1]
+            data_dir_geo = self.dataset_name.split(self.feature_to_predict)[1]
             for feature in self.additional_features:
                 celled_feature_path = pathlib.Path(
                     self.data_dir, "celled", feature + data_dir_geo
