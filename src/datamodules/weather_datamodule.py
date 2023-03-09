@@ -54,10 +54,9 @@ class Dataset_RNN(Dataset):
         target = self.data[
             idx + self.history_length : idx + self.history_length + self.periods_forward
         ]
-        if self.mode == "classificator":
+        if self.mode == "classification":
             target = torch.bucketize(target, self.boundaries)
 
-        print(target)
         return (
             input_tensor,
             target,

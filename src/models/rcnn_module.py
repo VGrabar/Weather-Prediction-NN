@@ -228,8 +228,6 @@ class RCNNModule(LightningModule):
             prediction = self.final_conv(next_h)
         elif self.mode == "classification":
             prediction = self.final_classify(next_h)
-            print(prediction.shape)
-            print("pred", prediction)
         self.prev_state_c = next_c
         self.prev_state_h = next_h
 
@@ -238,7 +236,7 @@ class RCNNModule(LightningModule):
     def step(self, batch: Any):
         x, y = batch
         preds = self.forward(x)
-        loss = self.criterion(preds, y)
+        loss = self.criterion(torch.amin(preds, (2,3)), torch.amin(y, (2,3)))
         return loss, preds, y
 
     def rolling_step(self, batch: Any):
