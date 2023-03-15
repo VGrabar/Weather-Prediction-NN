@@ -7,6 +7,7 @@ import torch.nn as nn
 from pytorch_lightning import LightningModule
 from sklearn.metrics import r2_score, roc_auc_score
 from torch.autograd import Variable
+#from torchmetrics.classification import BinaryAUROC
 
 from src.models.components.conv_block import ConvBlock
 from src.utils.metrics import rmse, rsquared, smape
@@ -74,6 +75,7 @@ class RCNNModule(LightningModule):
         self.tanh_coef = values_range
         # number of bins for pdsi
         self.num_class = num_classes
+        self.boundaries = torch.tensor([-2]).cuda()
 
         self.emb_size = embedding_size
         self.hid_size = hidden_state_size
@@ -173,7 +175,7 @@ class RCNNModule(LightningModule):
                 dilation=1,
                 groups=1,
             ),
-            nn.Softmax(dim=1),
+            #nn.Softmax(dim=1),
         )
 
         self.register_buffer(
@@ -236,8 +238,9 @@ class RCNNModule(LightningModule):
     def step(self, batch: Any):
         x, y = batch
         preds = self.forward(x)
-        loss = self.criterion(torch.amin(preds, (2,3)), torch.amin(y, (2,3)))
-        return loss, preds, y
+        # atm checking last prediction
+        loss = self.criterion(preds, y[:,-1,:,:])
+        return loss, preds, y[:, -1, :, :]
 
     def rolling_step(self, batch: Any):
         x, y = batch
@@ -253,6 +256,13 @@ class RCNNModule(LightningModule):
             rolling_forecast = torch.cat((rolling_forecast, rolling[:, None, :, :]), dim=1)
 
         return rolling_forecast
+    
+    def class_baseline(self, batch: Any):
+        x, y = batch
+        # return most frequent class along history_dim
+        x_binned = torch.bucketize(x, self.boundaries) 
+        most_freq_values, most_freq_indices =  torch.mode(x_binned, dim=1)
+        return most_freq_values
 
     def on_after_backward(self) -> None:
         self.prev_state_c.detach_()
@@ -270,18 +280,44 @@ class RCNNModule(LightningModule):
     def training_epoch_end(self, outputs: List[Any]):
         # `outputs` is a list of dicts returned from `training_step()`
         all_targets = outputs[0]["targets"]
-        if self.mode == "regression":
-            all_preds = outputs[0]["preds"]
-        elif self.mode == "classification":
-            all_preds = outputs[0]["preds"][1]
+        all_preds = outputs[0]["preds"]
 
         for i in range(1, len(outputs)):
-            if self.mode == "regression":
-                all_preds = torch.cat((all_preds, outputs[i]["preds"]), 0)
-            elif self.mode == "classification":
-                all_preds = torch.cat((all_preds, outputs[i]["preds"][1]), 0)
+            all_preds = torch.cat((all_preds, outputs[i]["preds"]), 0)
             all_targets = torch.cat((all_targets, outputs[i]["targets"]), 0)
+        
+        # probs for class 1
+        all_preds = torch.softmax(all_preds, dim=1)
+        all_preds = all_preds[:,1,:,:]
+        rocauc_table = torch.zeros(all_preds.shape[1],all_preds.shape[2])
+        for x in range(all_preds.shape[1]):
+            for y in range(all_preds.shape[2]):
+                try:
+                    rocauc_table[x][y] = roc_auc_score(all_targets[:,x,y].cpu().numpy(), all_preds[:,x,y].cpu().numpy())
+                except:
+                    rocauc_table[x][y] = 0
+                #rocauc_table[x][y] = BinaryAUROC(all_preds[:,x,y], all_targets[:,x,y])
 
+        if self.mode == "classification":
+            self.log(
+                "train/" + self.metric_name + "_min",
+                torch.min(rocauc_table),
+                on_epoch=True,
+                prog_bar=True,
+            )
+            self.log(
+                "train/" + self.metric_name + "_max",
+                torch.max(rocauc_table),
+                on_epoch=True,
+                prog_bar=True,
+            )
+            self.log(
+                "train/" + self.metric_name + "_median",
+                torch.median(rocauc_table),
+                on_epoch=True,
+                prog_bar=True,
+            )
+        
         # log metrics
         # r2table = rsquared(all_targets, all_preds, mode="mean")
         # self.log("train/R2_std", np.std(r2table), on_epoch=True, prog_bar=True)
@@ -289,20 +325,6 @@ class RCNNModule(LightningModule):
         # self.log("train/R2_min", np.min(r2table), on_epoch=True, prog_bar=True)
         # self.log("train/R2_max", np.max(r2table), on_epoch=True, prog_bar=True)
 
-        # add metric for classify
-        self.log(
-            "train/" + self.loss_name,
-            self.criterion(all_targets, all_preds),
-            on_epoch=True,
-            prog_bar=True,
-        )
-        if self.mode == "classification":
-            self.log(
-                "val/" + self.metric_name,
-                roc_auc_score(all_targets, all_preds),
-                on_epoch=True,
-                prog_bar=True,
-            )
 
     def validation_step(self, batch: Any, batch_idx: int):
         loss, preds, targets = self.step(batch)
@@ -313,17 +335,44 @@ class RCNNModule(LightningModule):
     def validation_epoch_end(self, outputs: List[Any]):
         
         all_targets = outputs[0]["targets"]
-        if self.mode == "regression":
-            all_preds = outputs[0]["preds"]
-        elif self.mode == "classification":
-            all_preds = outputs[0]["preds"][1]
+        all_preds = outputs[0]["preds"]
 
         for i in range(1, len(outputs)):
-            if self.mode == "regression":
-                all_preds = torch.cat((all_preds, outputs[i]["preds"]), 0)
-            elif self.mode == "classification":
-                all_preds = torch.cat((all_preds, outputs[i]["preds"][1]), 0)
+            all_preds = torch.cat((all_preds, outputs[i]["preds"]), 0)
             all_targets = torch.cat((all_targets, outputs[i]["targets"]), 0)
+        
+        # probs for class 1
+        all_preds = torch.softmax(all_preds, dim=1)
+        all_preds = all_preds[:,1,:,:]
+        rocauc_table = torch.zeros(all_preds.shape[1],all_preds.shape[2])
+        for x in range(all_preds.shape[1]):
+            for y in range(all_preds.shape[2]):
+                try:
+                    rocauc_table[x][y] = roc_auc_score(all_targets[:,x,y].cpu().numpy(), all_preds[:,x,y].cpu().numpy())
+                except:
+                    rocauc_table[x][y] = 0
+                #rocauc_table[x][y] = BinaryAUROC(all_preds[:,x,y], all_targets[:,x,y])
+
+        if self.mode == "classification":
+            self.log(
+                "val/" + self.metric_name + "_min",
+                torch.min(rocauc_table),
+                on_epoch=True,
+                prog_bar=True,
+            )
+            self.log(
+                "val/" + self.metric_name + "_max",
+                torch.max(rocauc_table),
+                on_epoch=True,
+                prog_bar=True,
+            )
+            self.log(
+                "val/" + self.metric_name + "_median",
+                torch.median(rocauc_table),
+                on_epoch=True,
+                prog_bar=True,
+            )
+        
 
         # log metrics
         # r2table = rsquared(all_targets, all_preds, mode="mean")
@@ -331,44 +380,84 @@ class RCNNModule(LightningModule):
         # self.log("val/R2", np.median(r2table), on_epoch=True, prog_bar=True)
         # self.log("val/R2_min", np.min(r2table), on_epoch=True, prog_bar=True)
         # self.log("val/R2_max", np.max(r2table), on_epoch=True, prog_bar=True)
-        self.log(
-            "val/" + self.loss_name,
-            self.criterion(all_targets, all_preds),
-            on_epoch=True,
-            prog_bar=True,
-        )
-        if self.mode == "classification":
-            self.log(
-                "val/" + self.metric_name,
-                roc_auc_score(all_targets, all_preds),
-                on_epoch=True,
-                prog_bar=True,
-            )
 
     def test_step(self, batch: Any, batch_idx: int):
         loss, preds, targets = self.step(batch)
-        rolling = self.rolling_step(batch)
+        if self.mode == "regression":
+            baseline = self.rolling_step(batch)
+        elif self.mode == "classification":
+            baseline = self.class_baseline(batch)
         self.log("test/loss", loss, on_step=False, on_epoch=True, prog_bar=True)
 
-        return {"loss": loss, "preds": preds, "targets": targets, "rolling": rolling}
+        return {"loss": loss, "preds": preds, "targets": targets, "baseline": baseline}
 
     def test_epoch_end(self, outputs: List[Any]):
         
         all_targets = outputs[0]["targets"]
-        all_rollings = outputs[0]["rolling"]
-        if self.mode == "regression":
-            all_preds = outputs[0]["preds"]
-        elif self.mode == "classification":
-            all_preds = outputs[0]["preds"][1]
+        all_baselines = outputs[0]["baseline"]
+        all_preds = outputs[0]["preds"]
 
         for i in range(1, len(outputs)):
-            if self.mode == "regression":
-                all_preds = torch.cat((all_preds, outputs[i]["preds"]), 0)
-            elif self.mode == "classification":
-                all_preds = torch.cat((all_preds, outputs[i]["preds"][1]), 0)
+            all_preds = torch.cat((all_preds, outputs[i]["preds"]), 0)
             all_targets = torch.cat((all_targets, outputs[i]["targets"]), 0)
-            all_rollings = torch.cat((all_rollings, outputs[i]["rolling"]), 0)
+            all_baselines = torch.cat((all_baselines, outputs[i]["baseline"]), 0)
 
+        # probs for class 1
+        all_preds = torch.softmax(all_preds, dim=1)
+        all_preds = all_preds[:,1,:,:]
+        rocauc_table = torch.zeros(all_preds.shape[1],all_preds.shape[2])
+        rocauc_table_baseline = torch.zeros(all_preds.shape[1],all_preds.shape[2])
+        for x in range(all_preds.shape[1]):
+            for y in range(all_preds.shape[2]):
+                try:
+                    rocauc_table[x][y] = roc_auc_score(all_targets[:,x,y].cpu().numpy(), all_preds[:,x,y].cpu().numpy())
+                except:
+                    rocauc_table[x][y] = 0
+                try:
+                    rocauc_table_baseline[x][y] = roc_auc_score(all_targets[:,x,y].cpu().numpy(), all_baselines[:,x,y].cpu().numpy())
+                except:
+                    rocauc_table_baseline[x][y] = 0
+                #rocauc_table[x][y] = BinaryAUROC(all_preds[:,x,y], all_targets[:,x,y])
+                #rocauc_table_baseline[x][y] = BinaryAUROC(all_baselines[:,x,y], all_targets[:,x,y])
+
+        if self.mode == "classification":
+            self.log(
+                "test/" + self.metric_name + "_min",
+                torch.min(rocauc_table),
+                on_epoch=True,
+                prog_bar=True,
+            )
+            self.log(
+                "test/baseline/" + self.metric_name + "_min",
+                torch.min(rocauc_table_baseline),
+                on_epoch=True,
+                prog_bar=True,
+            )
+            self.log(
+                "test/" + self.metric_name + "_max",
+                torch.max(rocauc_table),
+                on_epoch=True,
+                prog_bar=True,
+            )
+            self.log(
+                "test/baseline/" + self.metric_name + "_max",
+                torch.max(rocauc_table_baseline),
+                on_epoch=True,
+                prog_bar=True,
+            )
+            self.log(
+                "test/" + self.metric_name + "_median",
+                torch.median(rocauc_table),
+                on_epoch=True,
+                prog_bar=True,
+            )
+            self.log(
+                "test/baseline/" + self.metric_name + "_median",
+                torch.median(rocauc_table_baseline),
+                on_epoch=True,
+                prog_bar=True,
+            )
+        
         # log metrics
         # test_r2table = rsquared(all_targets, all_preds, mode="full")
         # self.log("test/R2_std", np.std(test_r2table), on_epoch=True, prog_bar=True)
@@ -377,23 +466,10 @@ class RCNNModule(LightningModule):
         # )
         # self.log("test/R2_min", np.min(test_r2table), on_epoch=True, prog_bar=True)
         # self.log("test/R2_max", np.max(test_r2table), on_epoch=True, prog_bar=True)
-        self.log(
-            "test/" + self.loss_name,
-            self.criterion(all_targets, all_preds),
-            on_epoch=True,
-            prog_bar=True,
-        )
         if self.mode == "regression":
             self.log(
-                "test/rolling_MSE",
-                self.criterion(all_rollings, all_targets),
-                on_epoch=True,
-                prog_bar=True,
-            )
-        if self.mode == "classification":
-            self.log(
-                "val/" + self.metric_name,
-                roc_auc_score(all_targets, all_preds),
+                "test/baseline_MSE",
+                self.criterion(all_baselines, all_targets),
                 on_epoch=True,
                 prog_bar=True,
             )
