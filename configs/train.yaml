@@ -61,6 +61,11 @@ n_cells_ver: 118
 history_length: 96
 periods_forward: 6
 mode: "classification" # "classification" or "regression"
+num_classes: 2 # for classifier
+boundaries: [-2] # for classifier
+feature_to_predict: "pdsi"
+num_of_additional_features: 0
+additional_features: [] # ["pr", "pet", "tmmn", "tmmx"]
 
 # default name for the experiment, determines logging folder path
 # (you can overwrite this name in experiment configs)

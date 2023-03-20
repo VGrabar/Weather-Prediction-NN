@@ -7,10 +7,9 @@ import torch.nn as nn
 from pytorch_lightning import LightningModule
 from sklearn.metrics import r2_score, roc_auc_score
 from torch.autograd import Variable
-#from torchmetrics.classification import BinaryAUROC
 
 from src.models.components.conv_block import ConvBlock
-from src.utils.metrics import rmse, rsquared, smape
+from src.utils.metrics import rmse, rsquared, smape, rocauc_celled
 from src.utils.plotting import make_heatmap, make_pred_vs_target_plot
 
 
@@ -52,6 +51,7 @@ class RCNNModule(LightningModule):
         periods_forward: int = 1,
         batch_size: int = 1,
         num_of_additional_features: int = 0,
+        boundaries: List[int] = [-2],
         num_classes: int = 2,
         values_range: int = 10,
         lr: float = 0.003,
@@ -75,7 +75,7 @@ class RCNNModule(LightningModule):
         self.tanh_coef = values_range
         # number of bins for pdsi
         self.num_class = num_classes
-        self.boundaries = torch.tensor([-2]).cuda()
+        self.boundaries = torch.tensor(boundaries).cuda()
 
         self.emb_size = embedding_size
         self.hid_size = hidden_state_size
@@ -285,19 +285,10 @@ class RCNNModule(LightningModule):
         for i in range(1, len(outputs)):
             all_preds = torch.cat((all_preds, outputs[i]["preds"]), 0)
             all_targets = torch.cat((all_targets, outputs[i]["targets"]), 0)
-        
-        # probs for class 1
         all_preds = torch.softmax(all_preds, dim=1)
         all_preds = all_preds[:,1,:,:]
-        rocauc_table = torch.zeros(all_preds.shape[1],all_preds.shape[2])
-        for x in range(all_preds.shape[1]):
-            for y in range(all_preds.shape[2]):
-                try:
-                    rocauc_table[x][y] = roc_auc_score(all_targets[:,x,y].cpu().numpy(), all_preds[:,x,y].cpu().numpy())
-                except:
-                    rocauc_table[x][y] = 0
-                #rocauc_table[x][y] = BinaryAUROC(all_preds[:,x,y], all_targets[:,x,y])
-
+        rocauc_table = rocauc_celled(all_targets, all_preds)
+        # log metrics
         if self.mode == "classification":
             self.log(
                 "train/" + self.metric_name + "_min",
@@ -314,6 +305,12 @@ class RCNNModule(LightningModule):
             self.log(
                 "train/" + self.metric_name + "_median",
                 torch.median(rocauc_table),
+                on_epoch=True,
+                prog_bar=True,
+            )
+            self.log(
+                "train/" + self.metric_name + "_mean",
+                torch.nanmean(rocauc_table),
                 on_epoch=True,
                 prog_bar=True,
             )
@@ -341,18 +338,10 @@ class RCNNModule(LightningModule):
             all_preds = torch.cat((all_preds, outputs[i]["preds"]), 0)
             all_targets = torch.cat((all_targets, outputs[i]["targets"]), 0)
         
-        # probs for class 1
         all_preds = torch.softmax(all_preds, dim=1)
         all_preds = all_preds[:,1,:,:]
-        rocauc_table = torch.zeros(all_preds.shape[1],all_preds.shape[2])
-        for x in range(all_preds.shape[1]):
-            for y in range(all_preds.shape[2]):
-                try:
-                    rocauc_table[x][y] = roc_auc_score(all_targets[:,x,y].cpu().numpy(), all_preds[:,x,y].cpu().numpy())
-                except:
-                    rocauc_table[x][y] = 0
-                #rocauc_table[x][y] = BinaryAUROC(all_preds[:,x,y], all_targets[:,x,y])
-
+        rocauc_table = rocauc_celled(all_targets, all_preds)
+        # log metrics
         if self.mode == "classification":
             self.log(
                 "val/" + self.metric_name + "_min",
@@ -369,6 +358,12 @@ class RCNNModule(LightningModule):
             self.log(
                 "val/" + self.metric_name + "_median",
                 torch.median(rocauc_table),
+                on_epoch=True,
+                prog_bar=True,
+            )
+            self.log(
+                "val/" + self.metric_name + "_mean",
+                torch.nanmean(rocauc_table),
                 on_epoch=True,
                 prog_bar=True,
             )
@@ -401,25 +396,12 @@ class RCNNModule(LightningModule):
             all_preds = torch.cat((all_preds, outputs[i]["preds"]), 0)
             all_targets = torch.cat((all_targets, outputs[i]["targets"]), 0)
             all_baselines = torch.cat((all_baselines, outputs[i]["baseline"]), 0)
-
-        # probs for class 1
+        
         all_preds = torch.softmax(all_preds, dim=1)
         all_preds = all_preds[:,1,:,:]
-        rocauc_table = torch.zeros(all_preds.shape[1],all_preds.shape[2])
-        rocauc_table_baseline = torch.zeros(all_preds.shape[1],all_preds.shape[2])
-        for x in range(all_preds.shape[1]):
-            for y in range(all_preds.shape[2]):
-                try:
-                    rocauc_table[x][y] = roc_auc_score(all_targets[:,x,y].cpu().numpy(), all_preds[:,x,y].cpu().numpy())
-                except:
-                    rocauc_table[x][y] = 0
-                try:
-                    rocauc_table_baseline[x][y] = roc_auc_score(all_targets[:,x,y].cpu().numpy(), all_baselines[:,x,y].cpu().numpy())
-                except:
-                    rocauc_table_baseline[x][y] = 0
-                #rocauc_table[x][y] = BinaryAUROC(all_preds[:,x,y], all_targets[:,x,y])
-                #rocauc_table_baseline[x][y] = BinaryAUROC(all_baselines[:,x,y], all_targets[:,x,y])
-
+        rocauc_table = rocauc_celled(all_targets, all_preds)
+        rocauc_table_baseline = rocauc_celled(all_targets, all_baselines)
+        # log metrics
         if self.mode == "classification":
             self.log(
                 "test/" + self.metric_name + "_min",
@@ -454,6 +436,12 @@ class RCNNModule(LightningModule):
             self.log(
                 "test/baseline/" + self.metric_name + "_median",
                 torch.median(rocauc_table_baseline),
+                on_epoch=True,
+                prog_bar=True,
+            )
+            self.log(
+                "test/" + self.metric_name + "_mean",
+                torch.nanmean(rocauc_table),
                 on_epoch=True,
                 prog_bar=True,
             )

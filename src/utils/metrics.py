@@ -1,7 +1,7 @@
 import numpy as np
 import torch
-from sklearn.metrics import r2_score
-
+from sklearn.metrics import r2_score, roc_auc_score
+#from torchmetrics.classification import BinaryAUROC
 
 def rmse(target, pred):
 
@@ -39,3 +39,22 @@ def rsquared(target, pred, mode: str = "mean"):
         #r2_median = np.median(r2_raw)
 
         return r2_raw
+
+
+def rocauc_celled(all_targets, all_preds):
+
+    # probs for class 1
+    all_preds = torch.softmax(all_preds, dim=1)
+    all_preds = all_preds[:,1,:,:]
+    rocauc_table = torch.zeros(all_preds.shape[1],all_preds.shape[2])
+    for x in range(all_preds.shape[1]):
+        for y in range(all_preds.shape[2]):
+            try:
+                rocauc_table[x][y] = roc_auc_score(all_targets[:,x,y].cpu().numpy(), all_preds[:,x,y].cpu().numpy())
+            except:
+                rocauc_table[x][y] = float("nan") #0
+            #rocauc_table[x][y] = BinaryAUROC(all_preds[:,x,y], all_targets[:,x,y])
+
+    return rocauc_table
+
+

@@ -11,7 +11,9 @@ n_cells_ver: ${n_cells_ver}
 history_length: ${history_length}
 periods_forward: ${periods_forward}
 batch_size: ${batch_size}
-num_of_additional_features: 0
+num_of_additional_features: ${num_of_additional_features}
+num_classes: ${num_classes}
+boundaries: ${boundaries}
 values_range: 10
 lr: 0.003
 weight_decay: 0

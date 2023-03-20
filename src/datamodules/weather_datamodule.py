@@ -28,8 +28,11 @@ class Dataset_RNN(Dataset):
         end_date: int,
         periods_forward: int,
         history_length: int,
+        boundaries: Optional[List[None]],
         transforms,
         mode,
+        normalize: bool,
+        moments: Optional[List[None]],
     ):
         self.data = transforms(celled_data[start_date:end_date])
         self.features = celled_features_list
@@ -39,8 +42,25 @@ class Dataset_RNN(Dataset):
         self.history_length = history_length
         self.mode = mode
         # bins for pdsi
-        #self.boundaries = torch.tensor([-4, -3, -2, -1, 1, 2, 3, 4])
-        self.boundaries = torch.tensor([-2])
+        self.boundaries = boundaries
+        # normalization
+        if moments:
+            self.moments = moments
+            if normalize:
+                self.data = (self.data - self.moments[0][0])/(self.moments[0][1] - self.moments[0][0])
+                i = 1
+                for feature in self.features:
+                    feature = (feature  - self.moments[i][0])/(self.moments[i][1] - self.moments[i][0])
+                    i += 1
+        else:
+            self.moments = []
+            if normalize:
+                self.data = (self.data - torch.min(self.data))/(torch.max(self.data) - torch.min(self.data))
+                self.moments.append((torch.min(self.data), torch.max(self.data)))
+                for feature in self.features:
+                    feature = (feature - torch.min(feature))/(torch.max(feature) - torch.min(feature))
+                    self.moments.append((torch.min(feature), torch.max(feature)))
+
 
     def __len__(self):
         return len(self.data) - self.periods_forward - self.history_length
@@ -51,6 +71,7 @@ class Dataset_RNN(Dataset):
             input_tensor = torch.cat(
                 (input_tensor, feature[idx : idx + self.history_length]), dim=0
             )
+            
         target = self.data[
             idx + self.history_length : idx + self.history_length + self.periods_forward
         ]
@@ -82,7 +103,7 @@ class WeatherDataModule(LightningDataModule):
 
     def __init__(
         self,
-        mode: str = "regressor",
+        mode: str = "regression",
         data_dir: str = "data",
         dataset_name: str = "dataset_name",
         left_border: int = 0,
@@ -103,6 +124,8 @@ class WeatherDataModule(LightningDataModule):
         feature_to_predict: str = "pdsi",
         num_of_additional_features: int = 0,
         additional_features: Optional[List[str]] = None,
+        boundaries: Optional[List[str]] = None,
+        normalize: bool = False,
         batch_size: int = 64,
         num_workers: int = 0,
         pin_memory: bool = False,
@@ -142,6 +165,8 @@ class WeatherDataModule(LightningDataModule):
         self.feature_to_predict = feature_to_predict
         self.num_of_features = num_of_additional_features + 1
         self.additional_features = additional_features
+        self.boundaries = boundaries
+        self.normalize = normalize
 
         self.batch_size = batch_size
         self.num_workers = num_workers
@@ -224,8 +249,10 @@ class WeatherDataModule(LightningDataModule):
                 train_end,
                 self.periods_forward,
                 self.history_length,
+                self.boundaries,
                 self.transforms,
                 self.mode,
+                self.normalize,
             )
             # valid_end = int(
             #     (self.train_val_test_split[0] + self.train_val_test_split[1])
@@ -239,8 +266,11 @@ class WeatherDataModule(LightningDataModule):
                 valid_end,
                 self.periods_forward,
                 self.history_length,
+                self.boundaries,
                 self.transforms,
                 self.mode,
+                self.normalize,
+                self.data_train.moments,
             )
             test_end = celled_data.shape[0]
             self.data_test = Dataset_RNN(
@@ -250,8 +280,11 @@ class WeatherDataModule(LightningDataModule):
                 test_end,
                 self.periods_forward,
                 self.history_length,
+                self.boundaries,
                 self.transforms,
                 self.mode,
+                self.normalize,
+                self.data_train.moments,
             )
 
     def train_dataloader(self):
