@@ -22,7 +22,7 @@ feature_to_predict: ${feature_to_predict}
 num_of_additional_features: ${num_of_additional_features}
 additional_features: ${additional_features}
 boundaries: ${boundaries}
-normalize: False
+normalize: True
 batch_size: ${batch_size}
 num_workers: 0
 pin_memory: False

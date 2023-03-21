@@ -54,6 +54,7 @@ class RCNNModule(LightningModule):
         boundaries: List[int] = [-2],
         num_classes: int = 2,
         values_range: int = 10,
+        dropout: float = 0.0,
         lr: float = 0.003,
         weight_decay: float = 0.0,
     ):
@@ -175,7 +176,7 @@ class RCNNModule(LightningModule):
                 dilation=1,
                 groups=1,
             ),
-            #nn.Softmax(dim=1),
+            # nn.Softmax(dim=1),
         )
 
         self.register_buffer(
@@ -212,6 +213,7 @@ class RCNNModule(LightningModule):
     def forward(self, x: torch.Tensor):
         prev_c = self.prev_state_c
         prev_h = self.prev_state_h
+        x = torch.nn.Dropout2d(p=self.dropout)
         x_emb = self.embedding(x)
         x_and_h = torch.cat([prev_h, x_emb], dim=1)
 
@@ -239,7 +241,7 @@ class RCNNModule(LightningModule):
         x, y = batch
         preds = self.forward(x)
         # atm checking last prediction
-        loss = self.criterion(preds, y[:,-1,:,:])
+        loss = self.criterion(preds, y[:, -1, :, :])
         return loss, preds, y[:, -1, :, :]
 
     def rolling_step(self, batch: Any):
@@ -253,15 +255,17 @@ class RCNNModule(LightningModule):
         for i in range(1, self.periods_forward):
             x = torch.cat((x[:, 1:, :, :], rolling[:, None, :, :]), dim=1)
             rolling = torch.mean(x, dim=1)
-            rolling_forecast = torch.cat((rolling_forecast, rolling[:, None, :, :]), dim=1)
+            rolling_forecast = torch.cat(
+                (rolling_forecast, rolling[:, None, :, :]), dim=1
+            )
 
         return rolling_forecast
-    
+
     def class_baseline(self, batch: Any):
         x, y = batch
         # return most frequent class along history_dim
-        x_binned = torch.bucketize(x, self.boundaries) 
-        most_freq_values, most_freq_indices =  torch.mode(x_binned, dim=1)
+        x_binned = torch.bucketize(x, self.boundaries)
+        most_freq_values, most_freq_indices = torch.mode(x_binned, dim=1)
         return most_freq_values
 
     def on_after_backward(self) -> None:
@@ -286,7 +290,7 @@ class RCNNModule(LightningModule):
             all_preds = torch.cat((all_preds, outputs[i]["preds"]), 0)
             all_targets = torch.cat((all_targets, outputs[i]["targets"]), 0)
         all_preds = torch.softmax(all_preds, dim=1)
-        all_preds = all_preds[:,1,:,:]
+        all_preds = all_preds[:, 1, :, :]
         rocauc_table = rocauc_celled(all_targets, all_preds)
         # log metrics
         if self.mode == "classification":
@@ -314,14 +318,13 @@ class RCNNModule(LightningModule):
                 on_epoch=True,
                 prog_bar=True,
             )
-        
+
         # log metrics
         # r2table = rsquared(all_targets, all_preds, mode="mean")
         # self.log("train/R2_std", np.std(r2table), on_epoch=True, prog_bar=True)
         # self.log("train/R2", np.median(r2table), on_epoch=True, prog_bar=True)
         # self.log("train/R2_min", np.min(r2table), on_epoch=True, prog_bar=True)
         # self.log("train/R2_max", np.max(r2table), on_epoch=True, prog_bar=True)
-
 
     def validation_step(self, batch: Any, batch_idx: int):
         loss, preds, targets = self.step(batch)
@@ -330,16 +333,16 @@ class RCNNModule(LightningModule):
         return {"loss": loss, "preds": preds, "targets": targets}
 
     def validation_epoch_end(self, outputs: List[Any]):
-        
+
         all_targets = outputs[0]["targets"]
         all_preds = outputs[0]["preds"]
 
         for i in range(1, len(outputs)):
             all_preds = torch.cat((all_preds, outputs[i]["preds"]), 0)
             all_targets = torch.cat((all_targets, outputs[i]["targets"]), 0)
-        
+
         all_preds = torch.softmax(all_preds, dim=1)
-        all_preds = all_preds[:,1,:,:]
+        all_preds = all_preds[:, 1, :, :]
         rocauc_table = rocauc_celled(all_targets, all_preds)
         # log metrics
         if self.mode == "classification":
@@ -367,7 +370,6 @@ class RCNNModule(LightningModule):
                 on_epoch=True,
                 prog_bar=True,
             )
-        
 
         # log metrics
         # r2table = rsquared(all_targets, all_preds, mode="mean")
@@ -387,7 +389,7 @@ class RCNNModule(LightningModule):
         return {"loss": loss, "preds": preds, "targets": targets, "baseline": baseline}
 
     def test_epoch_end(self, outputs: List[Any]):
-        
+
         all_targets = outputs[0]["targets"]
         all_baselines = outputs[0]["baseline"]
         all_preds = outputs[0]["preds"]
@@ -396,9 +398,9 @@ class RCNNModule(LightningModule):
             all_preds = torch.cat((all_preds, outputs[i]["preds"]), 0)
             all_targets = torch.cat((all_targets, outputs[i]["targets"]), 0)
             all_baselines = torch.cat((all_baselines, outputs[i]["baseline"]), 0)
-        
+
         all_preds = torch.softmax(all_preds, dim=1)
-        all_preds = all_preds[:,1,:,:]
+        all_preds = all_preds[:, 1, :, :]
         rocauc_table = rocauc_celled(all_targets, all_preds)
         rocauc_table_baseline = rocauc_celled(all_targets, all_baselines)
         # log metrics
@@ -445,7 +447,7 @@ class RCNNModule(LightningModule):
                 on_epoch=True,
                 prog_bar=True,
             )
-        
+
         # log metrics
         # test_r2table = rsquared(all_targets, all_preds, mode="full")
         # self.log("test/R2_std", np.std(test_r2table), on_epoch=True, prog_bar=True)

@@ -41,26 +41,36 @@ class Dataset_RNN(Dataset):
         self.periods_forward = periods_forward
         self.history_length = history_length
         self.mode = mode
+        self.target = self.data
         # bins for pdsi
         self.boundaries = boundaries
+        if self.mode == "classification":
+            self.target = torch.bucketize(self.target, self.boundaries)
         # normalization
         if moments:
             self.moments = moments
             if normalize:
-                self.data = (self.data - self.moments[0][0])/(self.moments[0][1] - self.moments[0][0])
+                self.data = (self.data - self.moments[0][0]) / (
+                    self.moments[0][1] - self.moments[0][0]
+                )
                 i = 1
                 for feature in self.features:
-                    feature = (feature  - self.moments[i][0])/(self.moments[i][1] - self.moments[i][0])
+                    feature = (feature - self.moments[i][0]) / (
+                        self.moments[i][1] - self.moments[i][0]
+                    )
                     i += 1
         else:
             self.moments = []
             if normalize:
-                self.data = (self.data - torch.min(self.data))/(torch.max(self.data) - torch.min(self.data))
+                self.data = (self.data - torch.min(self.data)) / (
+                    torch.max(self.data) - torch.min(self.data)
+                )
                 self.moments.append((torch.min(self.data), torch.max(self.data)))
                 for feature in self.features:
-                    feature = (feature - torch.min(feature))/(torch.max(feature) - torch.min(feature))
+                    feature = (feature - torch.min(feature)) / (
+                        torch.max(feature) - torch.min(feature)
+                    )
                     self.moments.append((torch.min(feature), torch.max(feature)))
-
 
     def __len__(self):
         return len(self.data) - self.periods_forward - self.history_length
@@ -71,12 +81,10 @@ class Dataset_RNN(Dataset):
             input_tensor = torch.cat(
                 (input_tensor, feature[idx : idx + self.history_length]), dim=0
             )
-            
-        target = self.data[
+
+        target = self.target[
             idx + self.history_length : idx + self.history_length + self.periods_forward
         ]
-        if self.mode == "classification":
-            target = torch.bucketize(target, self.boundaries)
 
         return (
             input_tensor,
@@ -146,7 +154,7 @@ class WeatherDataModule(LightningDataModule):
         self.transforms = transforms.Compose(
             [
                 transforms.Resize((self.n_cells_hor, self.n_cells_ver)),
-                #        transforms.Normalize((0.0), (1.0)),
+                # transforms.RandomErasing(p=0.25,scale=(0.1, 0.3), ratio=(0.5,2),value=0),
             ]
         )
         self.time_col = time_col
@@ -165,7 +173,7 @@ class WeatherDataModule(LightningDataModule):
         self.feature_to_predict = feature_to_predict
         self.num_of_features = num_of_additional_features + 1
         self.additional_features = additional_features
-        self.boundaries = boundaries
+        self.boundaries = torch.Tensor(boundaries)
         self.normalize = normalize
 
         self.batch_size = batch_size
@@ -253,6 +261,7 @@ class WeatherDataModule(LightningDataModule):
                 self.transforms,
                 self.mode,
                 self.normalize,
+                [],
             )
             # valid_end = int(
             #     (self.train_val_test_split[0] + self.train_val_test_split[1])
