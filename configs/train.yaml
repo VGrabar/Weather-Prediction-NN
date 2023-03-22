@@ -37,7 +37,7 @@ original_work_dir: ${hydra:runtime.cwd}
 data_dir: ${original_work_dir}/data/
 dataset_name: "pdsi_Belgorod_with_neighb.csv"  #"pdsi_voronezh.csv" # "precip_belgorod_20y_40x91.csv"
 batch_size: 1
-num_epochs: 50
+num_epochs: 150
 
 # pretty print config at the start of the run using Rich library
 print_config: True
@@ -64,9 +64,9 @@ mode: "classification" # "classification" or "regression"
 num_classes: 2 # for classifier
 boundaries: [-2] # for classifier
 feature_to_predict: "pdsi"
-num_of_additional_features: 0
-additional_features: [] #["pr", "pet", "tmmn", "tmmx"]
+num_of_additional_features: 4
+additional_features: ["pr", "pet", "tmmn", "tmmx"]
 
 # default name for the experiment, determines logging folder path
 # (you can overwrite this name in experiment configs)
-name: normalized_${dataset_name}_${model._target_}_history_${history_length}_forward_${periods_forward}
+name: dropout_features_normalized_${dataset_name}_${model._target_}_history_${history_length}_forward_${periods_forward}

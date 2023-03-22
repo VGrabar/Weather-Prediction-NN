@@ -75,6 +75,7 @@ class RCNNModule(LightningModule):
         self.num_of_features = num_of_additional_features + 1
         self.tanh_coef = values_range
         # number of bins for pdsi
+        self.dropout = torch.nn.Dropout2d(p=dropout)
         self.num_class = num_classes
         self.boundaries = torch.tensor(boundaries).cuda()
 
@@ -213,7 +214,7 @@ class RCNNModule(LightningModule):
     def forward(self, x: torch.Tensor):
         prev_c = self.prev_state_c
         prev_h = self.prev_state_h
-        x = torch.nn.Dropout2d(p=self.dropout)
+        x = self.dropout(x)
         x_emb = self.embedding(x)
         x_and_h = torch.cat([prev_h, x_emb], dim=1)
 
