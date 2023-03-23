@@ -8,17 +8,17 @@ from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
 from matplotlib.figure import Figure
 
 
-def make_heatmap(table, filename, size=(8, 6), linewidth=0.5, center=0):
+def make_heatmap(table, filename, size=(8, 6), linewidth=0.5, center=0.5):
 
     fig = Figure(figsize=size, frameon=False)
     canvas = FigureCanvas(fig)
     ax = fig.add_subplot(111)
-    ax = sns.heatmap(table, linewidth, center=None)
+    ax = sns.heatmap(table, linewidth, center=center)
 
-    full_path = os.path.expanduser(filename)
-    ax.figure.savefig(full_path)
+    #full_path = os.path.expanduser(filename)
+    #ax.figure.savefig(full_path)
     
-    return full_path
+    return ax
 
 
 def make_pred_vs_target_plot(
