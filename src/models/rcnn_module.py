@@ -170,16 +170,6 @@ class RCNNModule(LightningModule):
         self.final_classify = nn.Sequential(
             ConvBlock(
                 self.hid_size,
-                self.hid_size // 2,
-                kernel_size=3,
-                stride=1,
-                padding=1,
-                dilation=1,
-                groups=1,
-            ),
-            nn.ReLU(),
-            ConvBlock(
-                self.hid_size // 2,
                 self.num_class,
                 kernel_size=3,
                 stride=1,
@@ -187,7 +177,6 @@ class RCNNModule(LightningModule):
                 dilation=1,
                 groups=1,
             ),
-            # nn.Softmax(dim=1),
         )
 
         self.register_buffer(
@@ -413,9 +402,9 @@ class RCNNModule(LightningModule):
         rocauc_table = rocauc_celled(all_targets, all_preds)
         rocauc_table_baseline = rocauc_celled(all_targets, all_baselines)
         # log metrics
-        self.log_confusion_matrix(
-            y_true=torch.flatten(all_targets), y_predicted=torch.flatten(all_preds)
-        )
+        #self.logger.experiment.log_confusion_matrix(
+        #    y_true=torch.flatten(all_targets), y_predicted=torch.flatten(all_preds)
+        #)
         if self.mode == "classification":
             self.log(
                 "test/" + self.metric_name + "_min",
@@ -459,8 +448,8 @@ class RCNNModule(LightningModule):
                 on_epoch=True,
                 prog_bar=True,
             )
-        ax = make_heatmap(rocauc_table)
-        self.log_figure(figure=ax, figure_name="Spatial Distribution of RocAuc Score")
+        #ax = make_heatmap(rocauc_table)
+        #self.logger.experiment.log_figure(figure=ax, figure_name="Spatial Distribution of RocAuc Score")
         # log metrics
         # test_r2table = rsquared(all_targets, all_preds, mode="full")
         # self.log("test/R2_std", np.std(test_r2table), on_epoch=True, prog_bar=True)

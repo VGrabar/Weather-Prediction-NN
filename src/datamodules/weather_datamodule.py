@@ -34,10 +34,16 @@ class Dataset_RNN(Dataset):
         normalize: bool,
         moments: Optional[List[None]],
     ):
-        self.data = transforms(celled_data[start_date:end_date])
-        self.features = celled_features_list
-        for feature in self.features:
-            feature = transforms(feature[start_date:end_date])
+        # clean up data - remove 1st x and y spatial dims
+        self.data = transforms(celled_data[start_date:end_date, 1:, 1:])
+        self.features = [
+            transforms(feature[start_date:end_date, 1:, 1:])
+            for feature in celled_features_list
+        ]
+        # self.features = celled_features_list
+        # for i, feature in enumerate(self.features):
+        #    feature = transforms(feature[start_date:end_date, 1:, 1:])
+        #    print(feature.shape)
         self.periods_forward = periods_forward
         self.history_length = history_length
         self.mode = mode
@@ -45,7 +51,8 @@ class Dataset_RNN(Dataset):
         # bins for pdsi
         self.boundaries = boundaries
         if self.mode == "classification":
-            self.target = torch.bucketize(self.target, self.boundaries)
+            # 1 is for drought
+            self.target = 1 - torch.bucketize(self.target, self.boundaries)
         # normalization
         if moments:
             self.moments = moments
@@ -53,12 +60,10 @@ class Dataset_RNN(Dataset):
                 self.data = (self.data - self.moments[0][0]) / (
                     self.moments[0][1] - self.moments[0][0]
                 )
-                i = 1
-                for feature in self.features:
-                    feature = (feature - self.moments[i][0]) / (
-                        self.moments[i][1] - self.moments[i][0]
-                    )
-                    i += 1
+                for i in range(1, len(self.moments)):
+                    self.features[i - 1] = (
+                        self.features[i - 1] - self.moments[i][0]
+                    ) / (self.moments[i][1] - self.moments[i][0])
         else:
             self.moments = []
             if normalize:
@@ -66,11 +71,13 @@ class Dataset_RNN(Dataset):
                     torch.max(self.data) - torch.min(self.data)
                 )
                 self.moments.append((torch.min(self.data), torch.max(self.data)))
-                for feature in self.features:
-                    feature = (feature - torch.min(feature)) / (
-                        torch.max(feature) - torch.min(feature)
+                for i in range(len(self.features)):
+                    self.features[i] = (
+                        self.features[i] - torch.min(self.features[i])
+                    ) / (torch.max(self.features[i]) - torch.min(self.features[i]))
+                    self.moments.append(
+                        (torch.min(self.features[i]), torch.max(self.features[i]))
                     )
-                    self.moments.append((torch.min(feature), torch.max(feature)))
 
     def __len__(self):
         return len(self.data) - self.periods_forward - self.history_length
