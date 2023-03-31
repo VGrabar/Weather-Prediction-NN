@@ -10,7 +10,7 @@ from torch.autograd import Variable
 
 from src.models.components.conv_block import ConvBlock
 from src.utils.metrics import rmse, rsquared, smape, rocauc_celled
-from src.utils.plotting import make_heatmap, make_pred_vs_target_plot
+from src.utils.plotting import make_heatmap, make_cf_matrix
 
 
 class ScaledTanh(nn.Module):
@@ -401,10 +401,9 @@ class RCNNModule(LightningModule):
         all_preds = all_preds[:, 1, :, :]
         rocauc_table = rocauc_celled(all_targets, all_preds)
         rocauc_table_baseline = rocauc_celled(all_targets, all_baselines)
+        cf_path = make_cf_matrix(all_targets, all_preds)
+        self.logger.experiment[0].log_image(cf_path)
         # log metrics
-        #self.logger.experiment.log_confusion_matrix(
-        #    y_true=torch.flatten(all_targets), y_predicted=torch.flatten(all_preds)
-        #)
         if self.mode == "classification":
             self.log(
                 "test/" + self.metric_name + "_min",
@@ -448,8 +447,8 @@ class RCNNModule(LightningModule):
                 on_epoch=True,
                 prog_bar=True,
             )
-        #ax = make_heatmap(rocauc_table)
-        #self.logger.experiment.log_figure(figure=ax, figure_name="Spatial Distribution of RocAuc Score")
+        rocauc_path = make_heatmap(rocauc_table)
+        self.logger.experiment[0].log_image(rocauc_path)
         # log metrics
         # test_r2table = rsquared(all_targets, all_preds, mode="full")
         # self.log("test/R2_std", np.std(test_r2table), on_epoch=True, prog_bar=True)

@@ -6,20 +6,40 @@ import seaborn as sns
 import torch
 from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
 from matplotlib.figure import Figure
+from sklearn.metrics import confusion_matrix
 
+def make_heatmap(table, filename="rocauc_spatial.png", size=(8, 6), linewidth=0.5, center=0.5):
 
-def make_heatmap(table, filename, size=(8, 6), linewidth=0.5, center=0.5):
-
-    fig = Figure(figsize=size, frameon=False)
+    fig = Figure(figsize=size, frameon=True)
     canvas = FigureCanvas(fig)
     ax = fig.add_subplot(111)
-    ax = sns.heatmap(table, linewidth, center=center)
+    ax = sns.heatmap(table, linewidth, center=0.0)
+    ax.set_xticklabels([])
+    ax.set_yticklabels([])
 
-    #full_path = os.path.expanduser(filename)
-    #ax.figure.savefig(full_path)
+    full_path = os.path.expanduser(filename)
+    ax.figure.savefig(full_path)
+    ax.cla()
+
+    return full_path
+
+def make_cf_matrix(targets, preds, filename="cf_matrix.png", size=(8, 6)):
+   
+    targets = torch.flatten(targets).cpu().numpy()
+    preds = torch.bucketize(preds, torch.Tensor([0.5]).cuda())
+    preds = torch.flatten(preds).cpu().numpy()
+
+    cf_matrix = confusion_matrix(targets, preds)
+    fig = Figure(figsize=size, frameon=True)
+    ax = fig.add_subplot(111)
+    ax = sns.heatmap(cf_matrix/np.sum(cf_matrix), annot=True, fmt=".2%", cmap="Blues", cbar=False)
+
+    full_path = os.path.expanduser(filename)
+    ax.figure.savefig(full_path)
+    ax.cla()
+
+    return full_path
     
-    return ax
-
 
 def make_pred_vs_target_plot(
     preds,
