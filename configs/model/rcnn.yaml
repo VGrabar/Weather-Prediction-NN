@@ -15,6 +15,6 @@ num_of_additional_features: ${num_of_additional_features}
 num_classes: ${num_classes}
 boundaries: ${boundaries}
 values_range: 10
-dropout: 0.25
+dropout: 0.0
 lr: 0.003
 weight_decay: 0

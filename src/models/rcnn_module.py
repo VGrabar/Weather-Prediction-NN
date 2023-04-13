@@ -401,8 +401,10 @@ class RCNNModule(LightningModule):
         all_preds = all_preds[:, 1, :, :]
         rocauc_table = rocauc_celled(all_targets, all_preds)
         rocauc_table_baseline = rocauc_celled(all_targets, all_baselines)
-        cf_path = make_cf_matrix(all_targets, all_preds)
-        self.logger.experiment[0].log_image(cf_path)
+        for thr in [0.5, 0.75, 0.9]:
+            perc = str(int(100*thr))
+            cf_path = make_cf_matrix(all_targets, all_preds, thr, "cf_matrix_" + perc + ".png")
+            self.logger.experiment[0].log_image(cf_path)
         # log metrics
         if self.mode == "classification":
             self.log(
@@ -448,6 +450,7 @@ class RCNNModule(LightningModule):
                 prog_bar=True,
             )
         rocauc_path = make_heatmap(rocauc_table)
+        torch.save(rocauc_table, "rocauc_table.pt")
         self.logger.experiment[0].log_image(rocauc_path)
         # log metrics
         # test_r2table = rsquared(all_targets, all_preds, mode="full")

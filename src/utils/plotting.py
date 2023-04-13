@@ -23,10 +23,10 @@ def make_heatmap(table, filename="rocauc_spatial.png", size=(8, 6), linewidth=0.
 
     return full_path
 
-def make_cf_matrix(targets, preds, filename="cf_matrix.png", size=(8, 6)):
+def make_cf_matrix(targets, preds, threshold: float=0.5, filename: str="cf_matrix.png", size=(8, 6)):
    
     targets = torch.flatten(targets).cpu().numpy()
-    preds = torch.bucketize(preds, torch.Tensor([0.5]).cuda())
+    preds = torch.bucketize(preds, torch.Tensor([threshold]).cuda())
     preds = torch.flatten(preds).cpu().numpy()
 
     cf_matrix = confusion_matrix(targets, preds)
