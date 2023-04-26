@@ -199,10 +199,6 @@ class WeatherDataModule(LightningDataModule):
             celled_data = create_celled_data(
                 self.data_dir,
                 self.dataset_name,
-                self.left_border,
-                self.down_border,
-                self.right_border,
-                self.up_border,
                 self.time_col,
                 self.event_col,
                 self.x_col,
@@ -219,10 +215,6 @@ class WeatherDataModule(LightningDataModule):
                 celled_feature = create_celled_data(
                     self.data_dir,
                     feature + data_dir_geo,
-                    self.left_border,
-                    self.down_border,
-                    self.right_border,
-                    self.up_border,
                     self.time_col,
                     self.event_col,
                     self.x_col,
@@ -242,7 +234,11 @@ class WeatherDataModule(LightningDataModule):
         if not self.data_train and not self.data_val and not self.data_test:
             celled_data_path = pathlib.Path(self.data_dir, "celled", self.dataset_name)
             celled_data = torch.load(celled_data_path)
-            celled_data = celled_data[self.data_start : self.data_start + self.data_len]
+            celled_data = celled_data[
+                self.data_start : self.data_start + self.data_len,
+                self.down_border : self.up_border,
+                self.left_border : self.right_border,
+            ]
             # loading features
             celled_features_list = []
             data_dir_geo = self.dataset_name.split(self.feature_to_predict)[1]
@@ -252,7 +248,9 @@ class WeatherDataModule(LightningDataModule):
                 )
                 celled_feature = torch.load(celled_feature_path)
                 celled_feature = celled_feature[
-                    self.data_start : self.data_start + self.data_len
+                    self.data_start : self.data_start + self.data_len,
+                    self.down_border : self.up_border,
+                    self.left_border : self.right_border,
                 ]
                 celled_features_list.append(celled_feature)
 
