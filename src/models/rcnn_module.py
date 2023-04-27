@@ -85,6 +85,9 @@ class RCNNModule(LightningModule):
         self.dilation = dilation
         self.groups = groups
 
+        self.saved_predictions = None
+        self.saved_targets = None
+
         self.embedding = nn.Sequential(
             ConvBlock(
                 self.num_of_features * history_length,
@@ -399,6 +402,10 @@ class RCNNModule(LightningModule):
 
         all_preds = torch.softmax(all_preds, dim=1)
         all_preds = all_preds[:, 1, :, :]
+
+        self.saved_predictions = all_preds
+        self.saved_targets = all_targets
+
         rocauc_table = rocauc_celled(all_targets, all_preds)
         rocauc_table_baseline = rocauc_celled(all_targets, all_baselines)
         for thr in [0.5, 0.75, 0.9]:
