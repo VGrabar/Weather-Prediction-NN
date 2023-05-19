@@ -39,14 +39,21 @@ def main(config: DictConfig):
 
     all_preds = torch.stack((all_preds))
     all_preds = torch.mean(all_preds, dim=0)
-    rocauc_table = metrics.rocauc_celled(all_targets, all_preds)
-    res = torch.median(rocauc_table)
-    log.info(f"test_ensemble_median: {res}")
+    rocauc_table, ap_table, f1_table = metrics.metrics_celled(all_targets, all_preds)
+    res_rocauc = torch.median(rocauc_table)
+    res_ap = torch.median(ap_table)
+    res_f1 = torch.median(f1_table)
+    log.info(f"test_ensemble_median_rocauc: {res_rocauc}")
+    log.info(f"test_ensemble_median_ap: {res_ap}")
+    log.info(f"test_ensemble_median_f1: {res_f1}")
     with open("ens.txt", "a") as f:
         f.write(config.ckpt_folder + "\n")
-        f.write("median: " + str(res) + "\n")
+        f.write("median_rocauc: " + str(res_rocauc) + "\n")
         f.write("\n")
-
+        f.write("median_ap: " + str(res_ap) + "\n")
+        f.write("\n")
+        f.write("median_f1: " + str(res_f1) + "\n")
+        f.write("\n")
     return
 
 

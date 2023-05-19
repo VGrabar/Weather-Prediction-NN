@@ -441,10 +441,12 @@ class RCNNModule(LightningModule):
         rocauc_path = make_heatmap(rocauc_table, filename="rocauc_spatial.png")
         torch.save(rocauc_table, "rocauc_table.pt")
         self.logger.experiment[0].log_image(rocauc_path)
-        f1_path = make_heatmap(f1_table, filename="f1_spatial.png")
-        self.logger.experiment[0].log_image(f1_path)
-        ap_path = make_heatmap(ap_table, filename="ap_spatial.png")
-        self.logger.experiment[0].log_image(ap_path)
+
+        # f1_path = make_heatmap(f1_table, filename="f1_spatial.png")
+        # self.logger.experiment[0].log_image(f1_path)
+        # ap_path = make_heatmap(ap_table, filename="ap_spatial.png")
+        # self.logger.experiment[0].log_image(ap_path)
+        
         # log metrics
         # test_r2table = rsquared(all_targets, all_preds, mode="full")
         # self.log("test/R2_std", np.std(test_r2table), on_epoch=True, prog_bar=True)
