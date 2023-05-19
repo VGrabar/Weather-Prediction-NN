@@ -1,7 +1,6 @@
 import numpy as np
 import torch
-from sklearn.metrics import r2_score, roc_auc_score
-
+from sklearn.metrics import r2_score, roc_auc_score, f1_score, average_precision_score
 # from torchmetrics.classification import BinaryAUROC
 
 
@@ -38,14 +37,15 @@ def rsquared(target, pred, mode: str = "mean"):
 
         for b in range(pred_mean.shape[0]):
             r2_raw[b] = r2_score(target_mean[b, :], pred_mean[b, :])
-        # r2_median = np.median(r2_raw)
 
         return r2_raw
 
 
-def rocauc_celled(all_targets, all_preds):
+def metrics_celled(all_targets, all_preds):
 
     rocauc_table = torch.zeros(all_preds.shape[1], all_preds.shape[2])
+    f1_table = torch.zeros(all_preds.shape[1], all_preds.shape[2])
+    ap_table = torch.zeros(all_preds.shape[1], all_preds.shape[2])
     for x in range(all_preds.shape[1]):
         for y in range(all_preds.shape[2]):
             try:
@@ -53,7 +53,21 @@ def rocauc_celled(all_targets, all_preds):
                     all_targets[:, x, y].cpu().numpy(), all_preds[:, x, y].cpu().numpy()
                 )
             except:
-                rocauc_table[x][y] = 0  # float("nan") #0
+                rocauc_table[x][y] = 0
+            
+            try:
+                ap_table[x][y] = average_precision_score(
+                    all_targets[:, x, y].cpu().numpy(), all_preds[:, x, y].cpu().numpy()
+                )
+            except:
+                ap_table[x][y] = 0
+            
+            try:
+                f1_table[x][y] = f1_score(
+                    all_targets[:, x, y].cpu().numpy(), np.where(all_preds[:, x, y].cpu().numpy() > 0.5, 1, 0)
+                )
+            except:
+                f1_table[x][y] = 0
             # rocauc_table[x][y] = BinaryAUROC(all_preds[:,x,y], all_targets[:,x,y])
 
-    return rocauc_table
+    return rocauc_table, ap_table, f1_table

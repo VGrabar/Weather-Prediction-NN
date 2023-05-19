@@ -6,9 +6,9 @@ defaults:
   - datamodule: weather.yaml
   - model: rcnn.yaml
   - callbacks: null
-  - logger: null # set logger here or use command line (e.g. `python train.py logger=tensorboard`)
+  - logger: comet.yaml  # set logger here or use command line (e.g. `python train.py logger=tensorboard`)
   - trainer: default.yaml
-  - log_dir: evaluations.yaml
+  - log_dir: evaluation.yaml
 
   # experiment configs allow for version control of specific configurations
   # e.g. best hyperparameters for each combination of model and datamodule
@@ -35,7 +35,7 @@ original_work_dir: ${hydra:runtime.cwd}
 
 # path to folder with data
 data_dir: ${original_work_dir}/data/
-dataset_name: "pdsi_Belgorod_with_neighb.csv"
+dataset_name: "pdsi_Belarus_with_neighb.csv"
 batch_size: 1
 num_epochs: 100
 
@@ -56,8 +56,8 @@ test: True
 seed: null
 
 # parameters of the model that are shared with dataloader
-n_cells_hor: 54
-n_cells_ver: 118
+n_cells_hor: 62
+n_cells_ver: 124
 mode: "classification" # "classification" or "regression"
 num_classes: 2 # for classifier
 boundaries: [-2] # for classifier
@@ -67,10 +67,10 @@ additional_features: [] #["pr", "pet", "tmmn", "tmmx"]
 
 # default name for the experiment, determines logging folder path
 # (you can overwrite this name in experiment configs)
-name: stdev_${dataset_name}_${model._target_}_history_${history_length}_forward_${periods_forward}
-
-# checkpoints
-ckpt_folder: "logs/experiments/runs/stdev_pdsi_Belarus_with_neighb.csv_src.models.rcnn_module.RCNNModule_history_6_forward_1/" 
-ckpt_path: null
 history_length: 6
 periods_forward: 1
+name: ensemble_${dataset_name}_${model._target_}_history_${history_length}_forward_${periods_forward}
+
+# checkpoints
+ckpt_folder: logs/experiments/runs/stdev_pdsi_Belarus_with_neighb.csv_src.models.rcnn_module.RCNNModule_history_${history_length}_forward_${periods_forward}
+ckpt_path: null

@@ -35,7 +35,6 @@ class Dataset_RNN(Dataset):
         moments: Optional[List[None]],
     ):
         # clean up data - remove 1st x and y spatial dims
-        print(celled_data.shape)
         self.data = transforms(celled_data[start_date:end_date, 1:, 1:])
         self.features = [
             transforms(feature[start_date:end_date, 1:, 1:])
