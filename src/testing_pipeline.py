@@ -55,5 +55,6 @@ def test(config: DictConfig) -> None:
 
     log.info("Starting testing!")
     trainer.test(model=model, datamodule=datamodule, ckpt_path=config.ckpt_path)
-
-    return model.saved_predictions, model.saved_targets 
+    
+    return
+    #return model.saved_predictions, model.saved_targets 

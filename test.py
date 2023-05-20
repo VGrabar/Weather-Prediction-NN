@@ -25,11 +25,16 @@ def main(config: DictConfig):
     # Applies optional utilities
     utils.extras(config)
     # Evaluate model
-    #path = config.ckpt_folder
-    # for ck in Path(path).rglob("*.ckpt"):
-    #     if not "last" in str(ck):
-    #         chkpts.append(ck)
-        
+    chkpts = []
+    os.chdir("/Weather-Prediction-NN")
+    path = config.ckpt_folder
+    print(path)
+    for ck in Path(path).rglob("*.ckpt"):
+        if not "last" in str(ck):
+            chkpts.append(ck)
+    
+    print(chkpts)
+    config.ckpt_path = chkpts[0]
 
     return test(config)
 
@@ -37,4 +42,4 @@ def main(config: DictConfig):
 if __name__ == "__main__":
     
     
-    _,_ = main()
+    main()

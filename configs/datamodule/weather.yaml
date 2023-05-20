@@ -5,8 +5,8 @@ data_dir: ${data_dir}  # data_dir is specified in config.yaml
 dataset_name: ${dataset_name} 
 left_border: 0
 down_border: 0
-right_border: 200
-up_border: 250
+right_border: 350
+up_border: 350
 n_cells_hor: ${n_cells_hor}
 n_cells_ver: ${n_cells_ver}
 time_col: "date"

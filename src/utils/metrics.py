@@ -47,17 +47,17 @@ def metrics_celled(all_targets, all_preds):
     f1_table = torch.zeros(all_preds.shape[1], all_preds.shape[2])
     ap_table = torch.zeros(all_preds.shape[1], all_preds.shape[2])
     
-    rocauc = AUROC(task="binary")
-    rocauc_table = torch.tensor([[rocauc(all_preds[:, x, y], all_targets[:, x, y]) for x in all_preds.shape[1]] for y in all_preds.shape[2]])
+    rocauc = AUROC(task="binary", num_classes=1)
+    rocauc_table = torch.tensor([[rocauc(all_preds[:, x, y], all_targets[:, x, y]) for x in range(all_preds.shape[1])] for y in range(all_preds.shape[2])])
     rocauc_table = torch.nan_to_num(rocauc_table, nan=0.0)
 
     ap = AveragePrecision(task="binary")
-    ap_table = torch.tensor([[ap(all_preds[:, x, y], all_targets[:, x, y]) for x in all_preds.shape[1]] for y in all_preds.shape[2]])
+    ap_table = torch.tensor([[ap(all_preds[:, x, y], all_targets[:, x, y]) for x in range(all_preds.shape[1])] for y in range(all_preds.shape[2])])
     ap_table = torch.nan_to_num(ap_table, nan=0.0)
 
-    f1 = F1Score(task="binary")
-    f1_all_preds = torch.as_tensor((all_preds - 0.5) > 0, dtype=torch.int32) 
-    f1_table = torch.tensor([[f1(f1_all_preds[:, x, y], all_targets[:, x, y]) for x in all_preds.shape[1]] for y in all_preds.shape[2]])
+    f1 = F1Score(task="binary").to(torch.device("cuda", 0))
+    f1_all_preds = torch.as_tensor((all_preds - 0.5) > 0, dtype=torch.int32, device=torch.device("cuda")) 
+    f1_table = torch.tensor([[f1(f1_all_preds[:, x, y], all_targets[:, x, y]) for x in range(all_preds.shape[1])] for y in range(all_preds.shape[2])])
     f1_table = torch.nan_to_num(f1_table, nan=0.0)
 
     # for x in range(all_preds.shape[1]):

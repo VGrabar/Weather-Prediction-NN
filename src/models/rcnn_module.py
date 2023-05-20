@@ -9,7 +9,7 @@ from sklearn.metrics import r2_score, roc_auc_score
 from torch.autograd import Variable
 
 from src.models.components.conv_block import ConvBlock
-from src.utils.metrics import rmse, rsquared, smape, metrics_celled
+from src.utils.metrics import metrics_celled
 from src.utils.plotting import make_heatmap, make_cf_matrix
 
 

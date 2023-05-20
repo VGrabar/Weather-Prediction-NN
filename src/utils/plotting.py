@@ -13,7 +13,7 @@ def make_heatmap(table, filename="rocauc_spatial.png", size=(8, 6), linewidth=0.
     fig = Figure(figsize=size, frameon=True)
     canvas = FigureCanvas(fig)
     ax = fig.add_subplot(111)
-    ax = sns.heatmap(table, vmin=0.0, vmax=1.0, linewidths=linewidth)
+    ax = sns.heatmap(table, vmin=0.0, vmax=1.0) #, linewidths=linewidth)
     ax.set_xticklabels([])
     ax.set_yticklabels([])
 
