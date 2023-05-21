@@ -37,7 +37,7 @@ original_work_dir: ${hydra:runtime.cwd}
 data_dir: ${original_work_dir}/data/
 dataset_name: "pdsi_Belarus_with_neighb.csv"
 batch_size: 1
-num_epochs: 5
+num_epochs: 80
 
 # pretty print config at the start of the run using Rich library
 print_config: True
@@ -69,4 +69,4 @@ additional_features: [] #["pr", "pet", "tmmn", "tmmx"]
 
 # default name for the experiment, determines logging folder path
 # (you can overwrite this name in experiment configs)
-name: newmetrics_${dataset_name}_${model._target_}_history_${history_length}_forward_${periods_forward}
+name: newzoom_${dataset_name}_${model._target_}_history_${history_length}_forward_${periods_forward}

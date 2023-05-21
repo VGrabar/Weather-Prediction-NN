@@ -34,8 +34,8 @@ def main(config: DictConfig):
             chkpts.append(ck)
     
     print(chkpts)
-    config.ckpt_path = chkpts[0]
-
+    config.ckpt_path = chkpts[-1]
+    
     return test(config)
 
 
