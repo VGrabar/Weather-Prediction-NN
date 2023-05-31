@@ -293,7 +293,7 @@ class RCNNModule(LightningModule):
             all_targets = torch.cat((all_targets, outputs[i]["targets"]), 0)
         all_preds = torch.softmax(all_preds, dim=1)
         all_preds = all_preds[:, 1, :, :]
-        rocauc_table, ap_table, f1_table = metrics_celled(all_targets, all_preds)
+        rocauc_table, ap_table, f1_table, thr = metrics_celled(all_targets, all_preds)
         # log metrics
         if self.mode == "classification":
             self.log(
@@ -338,7 +338,7 @@ class RCNNModule(LightningModule):
 
         all_preds = torch.softmax(all_preds, dim=1)
         all_preds = all_preds[:, 1, :, :]
-        rocauc_table, ap_table, f1_table = metrics_celled(all_targets, all_preds)
+        rocauc_table, ap_table, f1_table, thr = metrics_celled(all_targets, all_preds)
         # log metrics
         if self.mode == "classification":
             self.log(
@@ -393,12 +393,20 @@ class RCNNModule(LightningModule):
         self.saved_predictions = all_preds
         self.saved_targets = all_targets
 
-        rocauc_table, ap_table, f1_table = metrics_celled(all_targets, all_preds)
-        rocauc_table_baseline, ap_table_baseline, f1_table_baseline = metrics_celled(all_targets, all_baselines)
-        for thr in [0.5, 0.75, 0.9]:
-            perc = str(int(100*thr))
-            cf_path = make_cf_matrix(all_targets, all_preds, thr, "cf_matrix_" + perc + ".png")
-            self.logger.experiment[0].log_image(cf_path)
+        rocauc_table, ap_table, f1_table, thr = metrics_celled(
+            all_targets, all_preds, "test"
+        )
+        (
+            rocauc_table_baseline,
+            ap_table_baseline,
+            f1_table_baseline,
+            thresholds,
+        ) = metrics_celled(all_targets, all_baselines, "test")
+        # log confusion matrix
+        cf_path = make_cf_matrix(
+            all_targets, all_preds, thresholds, "cf_matrix.png"
+        )
+        self.logger.experiment[0].log_image(cf_path)
         # log metrics
         if self.mode == "classification":
             self.log(
@@ -437,16 +445,11 @@ class RCNNModule(LightningModule):
                 on_epoch=True,
                 prog_bar=True,
             )
-        
+
         rocauc_path = make_heatmap(rocauc_table, filename="rocauc_spatial.png")
         torch.save(rocauc_table, "rocauc_table.pt")
         self.logger.experiment[0].log_image(rocauc_path)
 
-        # f1_path = make_heatmap(f1_table, filename="f1_spatial.png")
-        # self.logger.experiment[0].log_image(f1_path)
-        # ap_path = make_heatmap(ap_table, filename="ap_spatial.png")
-        # self.logger.experiment[0].log_image(ap_path)
-        
         # log metrics
         # test_r2table = rsquared(all_targets, all_preds, mode="full")
         # self.log("test/R2_std", np.std(test_r2table), on_epoch=True, prog_bar=True)
@@ -462,25 +465,6 @@ class RCNNModule(LightningModule):
                 on_epoch=True,
                 prog_bar=True,
             )
-
-        # logging figures and graphs
-        # log R2 table
-        # image_path = make_heatmap(test_r2table, image_name="confusion_matrix.png")
-        # self.logger.experiment.log_image(image_path, name="R2 Spatial Distribution")
-
-        # log plots
-        # make_pred_vs_target_plot(
-        #     all_preds,
-        #     all_targets,
-        #     title="Forecasting",
-        #     size=(8, 6),
-        #     xlabel="periods",
-        #     xlabel_rotate=45,
-        #     ylabel="Value",
-        #     ylabel_rotate=0,
-        #     filename= "preds_targets.png",
-        # )
-        # self.logger.Experiment.log_image("img", image_name, 0)
 
     def on_epoch_end(self):
         pass
