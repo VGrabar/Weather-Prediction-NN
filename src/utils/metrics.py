@@ -1,12 +1,12 @@
 import numpy as np
 import torch
-from torchmetrics.classification import AUROC, AveragePrecision, F1Score, ROC, MulticlassAccuracy
+from torchmetrics.classification import AUROC, AveragePrecision, F1Score, ROC, Accuracy
 
 
 def metrics_celled(all_targets, all_preds, n_classes, mode: str = "train"):
     if n_classes > 2:
         acc_table = torch.zeros(all_preds.shape[1], all_preds.shape[2])
-        acc = MulticlassAccuracy(num_classes=n_classes, top_k=1, average="micro")
+        acc = Accuracy(task="multiclass", num_classes=n_classes, top_k=1, average="micro")
         acc_table = torch.tensor(
             [
                 [
