@@ -52,7 +52,6 @@ class RCNNModule(LightningModule):
         batch_size: int = 1,
         num_of_additional_features: int = 0,
         boundaries: List[int] = [-2],
-        num_classes: int = 2,
         values_range: int = 10,
         dropout: float = 0.0,
         lr: float = 0.003,
@@ -76,7 +75,7 @@ class RCNNModule(LightningModule):
         self.tanh_coef = values_range
         # number of bins for pdsi
         self.dropout = torch.nn.Dropout2d(p=dropout)
-        self.num_class = num_classes
+        self.num_class = len(boundaries) + 1 
         self.boundaries = torch.tensor(boundaries).cuda()
 
         self.emb_size = embedding_size
@@ -293,12 +292,13 @@ class RCNNModule(LightningModule):
             all_targets = torch.cat((all_targets, outputs[i]["targets"]), 0)
         all_preds = torch.softmax(all_preds, dim=1)
         all_preds = all_preds[:, 1, :, :]
-        rocauc_table, ap_table, f1_table, thr = metrics_celled(all_targets, all_preds)
+
         # log metrics
-        if self.mode == "classification":
+        if self.mode == "classification" and self.num_class == 2:
+            rocauc_table, ap_table, f1_table, thr = metrics_celled(all_targets, all_preds)
             self.log(
                 "train/f1_median",
-                torch.min(f1_table),
+                torch.median(f1_table),
                 on_epoch=True,
                 prog_bar=True,
             )
@@ -311,6 +311,14 @@ class RCNNModule(LightningModule):
             self.log(
                 "train/rocauc_median",
                 torch.median(rocauc_table),
+                on_epoch=True,
+                prog_bar=True,
+            )
+        elif self.mode == "classification" and self.num_class > 2:
+            acc_table, ap_table, f1_table, thr = metrics_celled(all_targets, all_preds)
+            self.log(
+                "train/accuracy_median",
+                torch.median(acc_table),
                 on_epoch=True,
                 prog_bar=True,
             )
@@ -338,12 +346,13 @@ class RCNNModule(LightningModule):
 
         all_preds = torch.softmax(all_preds, dim=1)
         all_preds = all_preds[:, 1, :, :]
-        rocauc_table, ap_table, f1_table, thr = metrics_celled(all_targets, all_preds)
+        
         # log metrics
-        if self.mode == "classification":
+        if self.mode == "classification" and self.num_class == 2:
+            rocauc_table, ap_table, f1_table, thr = metrics_celled(all_targets, all_preds)
             self.log(
                 "val/f1_median",
-                torch.min(f1_table),
+                torch.median(f1_table),
                 on_epoch=True,
                 prog_bar=True,
             )
@@ -356,6 +365,14 @@ class RCNNModule(LightningModule):
             self.log(
                 "val/rocauc_median",
                 torch.median(rocauc_table),
+                on_epoch=True,
+                prog_bar=True,
+            )
+        elif self.mode == "classification" and self.num_class > 2:
+            acc_table, ap_table, f1_table, thr = metrics_celled(all_targets, all_preds)
+            self.log(
+                "val/accuracy_median",
+                torch.median(acc_table),
                 on_epoch=True,
                 prog_bar=True,
             )
@@ -393,25 +410,25 @@ class RCNNModule(LightningModule):
         self.saved_predictions = all_preds
         self.saved_targets = all_targets
 
-        rocauc_table, ap_table, f1_table, thr = metrics_celled(
-            all_targets, all_preds, "test"
-        )
-        (
-            rocauc_table_baseline,
-            ap_table_baseline,
-            f1_table_baseline,
-            thresholds,
-        ) = metrics_celled(all_targets, all_baselines, "test")
-        # log confusion matrix
-        cf_path = make_cf_matrix(
-            all_targets, all_preds, thresholds, "cf_matrix.png"
-        )
-        self.logger.experiment[0].log_image(cf_path)
-        # log metrics
-        if self.mode == "classification":
+        if self.mode == "classification" and self.num_class == 2:
+            rocauc_table, ap_table, f1_table, thr = metrics_celled(
+                all_targets, all_preds, "test"
+            )
+            (
+                rocauc_table_baseline,
+                ap_table_baseline,
+                f1_table_baseline,
+                thresholds,
+            ) = metrics_celled(all_targets, all_baselines, "test")
+            # log confusion matrix
+            cf_path = make_cf_matrix(
+                all_targets, all_preds, thresholds, "cf_matrix.png"
+            )
+            self.logger.experiment[0].log_image(cf_path)
+            # log metrics
             self.log(
                 "test/f1_median",
-                torch.min(f1_table),
+                torch.median(f1_table),
                 on_epoch=True,
                 prog_bar=True,
             )
@@ -429,7 +446,7 @@ class RCNNModule(LightningModule):
             )
             self.log(
                 "test/baseline/f1_median",
-                torch.min(f1_table_baseline),
+                torch.median(f1_table_baseline),
                 on_epoch=True,
                 prog_bar=True,
             )
@@ -446,9 +463,38 @@ class RCNNModule(LightningModule):
                 prog_bar=True,
             )
 
-        rocauc_path = make_heatmap(rocauc_table, filename="rocauc_spatial.png")
-        torch.save(rocauc_table, "rocauc_table.pt")
-        self.logger.experiment[0].log_image(rocauc_path)
+            rocauc_path = make_heatmap(rocauc_table, filename="rocauc_spatial.png")
+            torch.save(rocauc_table, "rocauc_table.pt")
+            self.logger.experiment[0].log_image(rocauc_path)
+
+        elif self.mode == "classification" and self.num_class > 2:
+            acc_table, ap_table, f1_table, thr = metrics_celled(
+                all_targets, all_preds, "test"
+            )
+            (
+                acc_table_baseline,
+                ap_table_baseline,
+                f1_table_baseline,
+                thresholds,
+            ) = metrics_celled(all_targets, all_baselines, "test")
+            
+            # log metrics
+            self.log(
+                "test/accuracy_median",
+                torch.median(acc_table),
+                on_epoch=True,
+                prog_bar=True,
+            )
+            self.log(
+                "test/baseline/accuracy_median",
+                torch.median(acc_table_baseline),
+                on_epoch=True,
+                prog_bar=True,
+            )
+
+            acc_path = make_heatmap(acc_table, filename="acc_spatial.png")
+            torch.save(acc_table, "acc_table.pt")
+            self.logger.experiment[0].log_image(acc_path)
 
         # log metrics
         # test_r2table = rsquared(all_targets, all_preds, mode="full")

@@ -3,5 +3,6 @@
 comet:
   _target_: pytorch_lightning.loggers.comet.CometLogger
   api_key: ${oc.env:COMET_API_TOKEN} # api key is loaded from environment variable
+  save_dir: logs/experiments/runs/${name}/${now:%Y-%m-%d}_${now:%H-%M-%S}
   project_name: "binary_classifier_weather_convlstm"
   experiment_name: ${name}
