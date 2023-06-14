@@ -291,7 +291,8 @@ class RCNNModule(LightningModule):
             all_preds = torch.cat((all_preds, outputs[i]["preds"]), 0)
             all_targets = torch.cat((all_targets, outputs[i]["targets"]), 0)
         all_preds = torch.softmax(all_preds, dim=1)
-        all_preds = all_preds[:, 1, :, :]
+        if self.num_class == 2:
+            all_preds = all_preds[:, 1, :, :]
 
         # log metrics
         if self.mode == "classification" and self.num_class == 2:
@@ -347,9 +348,10 @@ class RCNNModule(LightningModule):
         for i in range(1, len(outputs)):
             all_preds = torch.cat((all_preds, outputs[i]["preds"]), 0)
             all_targets = torch.cat((all_targets, outputs[i]["targets"]), 0)
-
+        
         all_preds = torch.softmax(all_preds, dim=1)
-        all_preds = all_preds[:, 1, :, :]
+        if self.num_class == 2:
+            all_preds = all_preds[:, 1, :, :]
 
         # log metrics
         if self.mode == "classification" and self.num_class == 2:
@@ -413,7 +415,8 @@ class RCNNModule(LightningModule):
             all_baselines = torch.cat((all_baselines, outputs[i]["baseline"]), 0)
 
         all_preds = torch.softmax(all_preds, dim=1)
-        all_preds = all_preds[:, 1, :, :]
+        if self.num_class == 2:
+            all_preds = all_preds[:, 1, :, :]
 
         self.saved_predictions = all_preds
         self.saved_targets = all_targets
@@ -427,7 +430,7 @@ class RCNNModule(LightningModule):
                 ap_table_baseline,
                 f1_table_baseline,
                 thresholds,
-            ) = metrics_celled(all_targets, all_baselines, "test")
+            ) = metrics_celled(all_targets, all_baselines, self.num_class, "test")
             # log confusion matrix
             cf_path = make_cf_matrix(
                 all_targets, all_preds, thresholds, "cf_matrix.png"
@@ -484,7 +487,7 @@ class RCNNModule(LightningModule):
                 ap_table_baseline,
                 f1_table_baseline,
                 thresholds,
-            ) = metrics_celled(all_targets, all_baselines, "test")
+            ) = metrics_celled(all_targets, all_baselines, self.num_class, "test")
 
             # log metrics
             self.log(
