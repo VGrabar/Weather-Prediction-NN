@@ -75,7 +75,7 @@ class RCNNModule(LightningModule):
         self.tanh_coef = values_range
         # number of bins for pdsi
         self.dropout = torch.nn.Dropout2d(p=dropout)
-        self.num_class = len(boundaries) + 1 
+        self.num_class = len(boundaries) + 1
         self.boundaries = torch.tensor(boundaries).cuda()
 
         self.emb_size = embedding_size
@@ -295,7 +295,9 @@ class RCNNModule(LightningModule):
 
         # log metrics
         if self.mode == "classification" and self.num_class == 2:
-            rocauc_table, ap_table, f1_table, thr = metrics_celled(all_targets, all_preds)
+            rocauc_table, ap_table, f1_table, thr = metrics_celled(
+                all_targets, all_preds, self.num_class
+            )
             self.log(
                 "train/f1_median",
                 torch.median(f1_table),
@@ -315,7 +317,9 @@ class RCNNModule(LightningModule):
                 prog_bar=True,
             )
         elif self.mode == "classification" and self.num_class > 2:
-            acc_table, ap_table, f1_table, thr = metrics_celled(all_targets, all_preds)
+            acc_table, ap_table, f1_table, thr = metrics_celled(
+                all_targets, all_preds, self.num_class
+            )
             self.log(
                 "train/accuracy_median",
                 torch.median(acc_table),
@@ -346,10 +350,12 @@ class RCNNModule(LightningModule):
 
         all_preds = torch.softmax(all_preds, dim=1)
         all_preds = all_preds[:, 1, :, :]
-        
+
         # log metrics
         if self.mode == "classification" and self.num_class == 2:
-            rocauc_table, ap_table, f1_table, thr = metrics_celled(all_targets, all_preds)
+            rocauc_table, ap_table, f1_table, thr = metrics_celled(
+                all_targets, all_preds, self.num_class
+            )
             self.log(
                 "val/f1_median",
                 torch.median(f1_table),
@@ -369,7 +375,9 @@ class RCNNModule(LightningModule):
                 prog_bar=True,
             )
         elif self.mode == "classification" and self.num_class > 2:
-            acc_table, ap_table, f1_table, thr = metrics_celled(all_targets, all_preds)
+            acc_table, ap_table, f1_table, thr = metrics_celled(
+                all_targets, all_preds, self.num_class
+            )
             self.log(
                 "val/accuracy_median",
                 torch.median(acc_table),
@@ -412,7 +420,7 @@ class RCNNModule(LightningModule):
 
         if self.mode == "classification" and self.num_class == 2:
             rocauc_table, ap_table, f1_table, thr = metrics_celled(
-                all_targets, all_preds, "test"
+                all_targets, all_preds, self.num_class, "test"
             )
             (
                 rocauc_table_baseline,
@@ -469,7 +477,7 @@ class RCNNModule(LightningModule):
 
         elif self.mode == "classification" and self.num_class > 2:
             acc_table, ap_table, f1_table, thr = metrics_celled(
-                all_targets, all_preds, "test"
+                all_targets, all_preds, self.num_class, "test"
             )
             (
                 acc_table_baseline,
@@ -477,7 +485,7 @@ class RCNNModule(LightningModule):
                 f1_table_baseline,
                 thresholds,
             ) = metrics_celled(all_targets, all_baselines, "test")
-            
+
             # log metrics
             self.log(
                 "test/accuracy_median",

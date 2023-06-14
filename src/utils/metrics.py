@@ -6,7 +6,9 @@ from torchmetrics.classification import AUROC, AveragePrecision, F1Score, ROC, A
 def metrics_celled(all_targets, all_preds, n_classes, mode: str = "train"):
     if n_classes > 2:
         acc_table = torch.zeros(all_preds.shape[1], all_preds.shape[2])
-        acc = Accuracy(task="multiclass", num_classes=n_classes, top_k=1, average="micro")
+        acc = Accuracy(
+            task="multiclass", num_classes=n_classes, top_k=1, average="micro"
+        )
         acc_table = torch.tensor(
             [
                 [
@@ -58,6 +60,5 @@ def metrics_celled(all_targets, all_preds, n_classes, mode: str = "train"):
 
             ap_table = torch.nan_to_num(ap_table, nan=0.0)
             f1_table = torch.nan_to_num(f1_table, nan=0.0)
-
 
     return rocauc_table, ap_table, f1_table, thresholds
