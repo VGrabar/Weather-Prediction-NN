@@ -31,7 +31,7 @@ def metrics_celled(all_targets, all_preds, mode: str = "train"):
                 j_stat = tpr - fpr
                 ind = torch.argmax(j_stat).item()
                 thresholds[x][y] = thr[ind]
-                print(thresholds[x][y]
+                print(thresholds[x][y])
                 f1 = F1Score(task="binary", threshold=thresholds[x][y]).to(
                     torch.device("cuda", 0)
                 )
