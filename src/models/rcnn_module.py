@@ -403,63 +403,61 @@ class RCNNModule(LightningModule):
             thresholds,
         ) = metrics_celled(all_targets, all_baselines, "test")
         # log confusion matrix
-        cf_path = make_cf_matrix(
-            all_targets, all_preds, thresholds, "cf_matrix.png"
-        )
+        cf_path = make_cf_matrix(all_targets, all_preds, thresholds, "cf_matrix.png")
         self.logger.experiment[0].log_image(cf_path)
         # log metrics
         if self.mode == "classification":
-	    print("F1")
+            print("F1")
             print(f1_table.shape())
-		print(torch.min(f1_table))
-		print(torch.max(f1_table))
-		print(torch.median(f1_table))
-		self.log(
-			"test/f1_median",
-			torch.median(f1_table),
-			on_epoch=True,
-			prog_bar=True,
-		)
-		print("AP")
-		print(ap_table.shape())
-		print(torch.min(ap_table))
-	        print(torch.max(ap_table))
-	        print(torch.median(ap_table))
-                self.log(
-                	"test/ap_median",
-                	torch.median(ap_table),
-                	on_epoch=True,
-                	prog_bar=True,
-            	)
-            	print("RocAuc")
-	    	print(rocauc_table.shape())
-	    	print(torch.min(rocauc_table))
-	    	print(torch.max(rocauc_table))
-	    	print(torch.median(rocauc_table))
-            	self.log(
-                	"test/rocauc_median",
-                	torch.median(rocauc_table),
-                	on_epoch=True,
-                	prog_bar=True,
-            	)
-            	self.log(
-                	"test/baseline/f1_median",
-                	torch.median(f1_table_baseline),
-                	on_epoch=True,
-                	prog_bar=True,
-            	)
-            	self.log(
-                	"test/baseline/ap_median",
-                	torch.median(ap_table_baseline),
-                	on_epoch=True,
-                	prog_bar=True,
-            	)
-            	self.log(
-                	"test/baseline/rocauc_median",
-                	torch.median(rocauc_table_baseline),
-                	on_epoch=True,
-                	prog_bar=True,
-            	)
+            print(torch.min(f1_table))
+            print(torch.max(f1_table))
+            print(torch.median(f1_table))
+            self.log(
+                "test/f1_median",
+                torch.median(f1_table),
+                on_epoch=True,
+                prog_bar=True,
+            )
+            print("AP")
+            print(ap_table.shape())
+            print(torch.min(ap_table))
+            print(torch.max(ap_table))
+            print(torch.median(ap_table))
+            self.log(
+                "test/ap_median",
+                torch.median(ap_table),
+                on_epoch=True,
+                prog_bar=True,
+            )
+            print("RocAuc")
+            print(rocauc_table.shape())
+            print(torch.min(rocauc_table))
+            print(torch.max(rocauc_table))
+            print(torch.median(rocauc_table))
+            self.log(
+                "test/rocauc_median",
+                torch.median(rocauc_table),
+                on_epoch=True,
+                prog_bar=True,
+            )
+            self.log(
+                "test/baseline/f1_median",
+                torch.median(f1_table_baseline),
+                on_epoch=True,
+                prog_bar=True,
+            )
+            self.log(
+                "test/baseline/ap_median",
+                torch.median(ap_table_baseline),
+                on_epoch=True,
+                prog_bar=True,
+            )
+            self.log(
+                "test/baseline/rocauc_median",
+                torch.median(rocauc_table_baseline),
+                on_epoch=True,
+                prog_bar=True,
+            )
 
         rocauc_path = make_heatmap(rocauc_table, filename="rocauc_spatial.png")
         torch.save(rocauc_table, "rocauc_table.pt")
