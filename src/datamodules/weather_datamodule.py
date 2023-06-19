@@ -203,6 +203,7 @@ class WeatherDataModule(LightningDataModule):
                 self.x_col,
                 self.y_col,
             )
+            print(celled_data.shape)
             torch.save(celled_data, celled_data_path)
 
         data_dir_geo = self.dataset_name.split(self.feature_to_predict)[1]

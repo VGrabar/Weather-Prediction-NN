@@ -28,9 +28,11 @@ def make_cf_matrix(
     targets, preds, thresholds, filename: str = "cf_matrix.png", size=(8, 6)
 ):
     targets = torch.flatten(targets).cpu().numpy()
-    for x in range(preds.shape[0]):
-        for y in range(preds.shape[1]):
-            preds[x][y] = torch.bucketize(preds, torch.Tensor([thresholds[x][y]]).cuda())
+    print(preds.shape)
+    print(thresholds.shape)
+    for x in range(preds.shape[1]):
+        for y in range(preds.shape[2]):
+            preds[:,x,y] = torch.bucketize(preds[:,x,y], torch.Tensor([thresholds[x][y]]).cuda())
     preds = torch.flatten(preds).cpu().numpy()
 
     cf_matrix = confusion_matrix(targets, preds)
