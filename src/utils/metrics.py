@@ -31,37 +31,12 @@ def metrics_celled(all_targets, all_preds, mode: str = "train"):
                 j_stat = tpr - fpr
                 ind = torch.argmax(j_stat).item()
                 thresholds[x][y] = thr[ind]
-                print(thresholds[x][y])
                 f1 = F1Score(task="binary", threshold=thresholds[x][y]).to(
                     torch.device("cuda", 0)
                 )
-                f1_table = f1(all_preds[:, x, y], all_targets[:, x, y])
+                f1_table[x][y] = f1(all_preds[:, x, y], all_targets[:, x, y])
 
         ap_table = torch.nan_to_num(ap_table, nan=0.0)
         f1_table = torch.nan_to_num(f1_table, nan=0.0)
-
-        # ap = AveragePrecision(task="binary")
-        # ap_table = torch.tensor(
-        #     [
-        #         [
-        #             ap(all_preds[:, x, y], all_targets[:, x, y])
-        #             for x in range(all_preds.shape[1])
-        #         ]
-        #         for y in range(all_preds.shape[2])
-        #     ]
-        # )
-        # ap_table = torch.nan_to_num(ap_table, nan=0.0)
-
-        # f1 = F1Score(task="binary", threshold=thr).to(torch.device("cuda", 0))
-        # f1_table = torch.tensor(
-        #     [
-        #         [
-        #             f1(all_preds[:, x, y], all_targets[:, x, y])
-        #             for x in range(all_preds.shape[1])
-        #         ]
-        #         for y in range(all_preds.shape[2])
-        #     ]
-        # )
-        # f1_table = torch.nan_to_num(f1_table, nan=0.0)
 
     return rocauc_table, ap_table, f1_table, thresholds
