@@ -182,6 +182,7 @@ class WeatherDataModule(LightningDataModule):
         self.num_of_features = num_of_additional_features + 1
         self.additional_features = additional_features
         self.boundaries = torch.Tensor(boundaries)
+        self.num_classes = len(self.boundaries) + 1
         self.normalize = normalize
 
         self.batch_size = batch_size
