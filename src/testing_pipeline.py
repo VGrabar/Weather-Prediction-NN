@@ -31,6 +31,7 @@ def test(config: DictConfig) -> None:
 
     # Init lightning datamodule
     log.info(f"Instantiating datamodule <{config.datamodule._target_}>")
+    config.datamodule.num_classes = 3 # custom
     datamodule: LightningDataModule = hydra.utils.instantiate(config.datamodule)
 
     # Init lightning model

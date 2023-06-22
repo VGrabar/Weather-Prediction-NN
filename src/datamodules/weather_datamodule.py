@@ -50,9 +50,10 @@ class Dataset_RNN(Dataset):
         self.target = self.data
         # bins for pdsi
         self.boundaries = boundaries
+        self.num_classes = len(boundaries) + 1
         if self.mode == "classification":
             # 1 is for drought
-            self.target = 1 - torch.bucketize(self.target, self.boundaries)
+            self.target = self.num_classes - 1 - torch.bucketize(self.target, self.boundaries)
         # normalization
         if moments:
             self.moments = moments

@@ -388,64 +388,73 @@ class RCNNModule(LightningModule):
             all_baselines = torch.cat((all_baselines, outputs[i]["baseline"]), 0)
 
         all_preds = torch.softmax(all_preds, dim=1)
-        all_preds = all_preds[:, 1, :, :]
+        for k in [10, 20, 30, 40, 50, 60, 70, 80, 90]:
+            new_preds = torch.empty((all_preds.size[0], 3, all_preds.size[2], all_preds.size[3]))
+            new_baselines = torch.empty((all_preds.size[0], 3, all_preds.size[2], all_preds.size[3]))
+            new_preds[:, 2, :, :] = all_preds[:, 1, :, :]
+            new_baselines[:, 2, :, :] = all_baselines[:, 1, :, :]
+            #all_preds = all_preds[:, 1, :, :]
+            new_preds[:, 1, :, :] = (1 - k/100) * all_preds[:, 0, :, :]
+            new_preds[:, 0, :, :] = (k/100) * all_preds[:, 0, :, :]
+            new_baselines[:, 1, :, :] = (1 - k/100) * all_baselines[:, 0, :, :]
+            new_baselines[:, 0, :, :] = (k/100) * all_baselines[:, 0, :, :]
 
-        self.saved_predictions = all_preds
-        self.saved_targets = all_targets
+            self.saved_predictions = new_preds
+            self.saved_targets = all_targets
 
-        rocauc_table, ap_table, f1_table, thr = metrics_celled(
-            all_targets, all_preds, "test"
-        )
-        (
-            rocauc_table_baseline,
-            ap_table_baseline,
-            f1_table_baseline,
-            thresholds,
-        ) = metrics_celled(all_targets, all_baselines, "test")
-        # log confusion matrix
-        cf_path = make_cf_matrix(all_targets, all_preds, thresholds, "cf_matrix.png")
-        self.logger.experiment[0].log_image(cf_path)
-        # log metrics
-        if self.mode == "classification":
-            self.log(
-                "test/f1_median",
-                torch.median(f1_table),
-                on_epoch=True,
-                prog_bar=True,
+            acc_table, ap_table, f1_table, thr = metrics_celled(
+                all_targets, new_preds, "test"
             )
-            self.log(
-                "test/ap_median",
-                torch.median(ap_table),
-                on_epoch=True,
-                prog_bar=True,
-            )
-            self.log(
-                "test/rocauc_median",
-                torch.median(rocauc_table),
-                on_epoch=True,
-                prog_bar=True,
-            )
-            self.log(
-                "test/baseline/f1_median",
-                torch.median(f1_table_baseline),
-                on_epoch=True,
-                prog_bar=True,
-            )
-            self.log(
-                "test/baseline/ap_median",
-                torch.median(ap_table_baseline),
-                on_epoch=True,
-                prog_bar=True,
-            )
-            self.log(
-                "test/baseline/rocauc_median",
-                torch.median(rocauc_table_baseline),
-                on_epoch=True,
-                prog_bar=True,
-            )
+            (
+                acc_table_baseline,
+                ap_table_baseline,
+                f1_table_baseline,
+                thresholds,
+            ) = metrics_celled(all_targets, new_baselines, "test")
+            # log confusion matrix
+            #cf_path = make_cf_matrix(all_targets, all_preds, thresholds, "cf_matrix.png")
+            self.logger.experiment[0].log_image(cf_path)
+            # log metrics
+            if self.mode == "classification":
+                self.log(
+                    f"test/f1_median_{k}",
+                    torch.median(f1_table),
+                    on_epoch=True,
+                    prog_bar=True,
+                )
+                self.log(
+                    f"test/ap_median_{k}",
+                    torch.median(ap_table),
+                    on_epoch=True,
+                    prog_bar=True,
+                )
+                self.log(
+                    f"test/accuracy_median_{k}",
+                    torch.median(acc_table),
+                    on_epoch=True,
+                    prog_bar=True,
+                )
+                self.log(
+                    f"test/baseline/f1_median_{k}",
+                    torch.median(f1_table_baseline),
+                    on_epoch=True,
+                    prog_bar=True,
+                )
+                self.log(
+                    f"test/baseline/ap_median_{k}",
+                    torch.median(ap_table_baseline),
+                    on_epoch=True,
+                    prog_bar=True,
+                )
+                self.log(
+                    f"test/baseline/rocauc_median_{k}",
+                    torch.median(acc_table_baseline),
+                    on_epoch=True,
+                    prog_bar=True,
+                )
 
-        rocauc_path = make_heatmap(rocauc_table, filename="rocauc_spatial.png")
-        torch.save(rocauc_table, "rocauc_table.pt")
+        rocauc_path = make_heatmap(acc_table, filename="accuracy_spatial.png")
+        torch.save(acc_table, "rocauc_table.pt")
         self.logger.experiment[0].log_image(rocauc_path)
 
         # log metrics
