@@ -28,6 +28,7 @@ class Dataset_RNN(Dataset):
         end_date: int,
         periods_forward: int,
         history_length: int,
+        num_classes: int,
         boundaries: Optional[List[None]],
         transforms,
         mode,
@@ -50,7 +51,7 @@ class Dataset_RNN(Dataset):
         self.target = self.data
         # bins for pdsi
         self.boundaries = boundaries
-        self.num_classes = len(boundaries) + 1
+        self.num_classes = num_classes
         if self.mode == "classification":
             # 1 is for drought
             self.target = self.num_classes - 1 - torch.bucketize(self.target, self.boundaries)
@@ -141,6 +142,7 @@ class WeatherDataModule(LightningDataModule):
         num_of_additional_features: int = 0,
         additional_features: Optional[List[str]] = None,
         boundaries: Optional[List[str]] = None,
+        num_classes: int = 2,
         normalize: bool = False,
         batch_size: int = 64,
         num_workers: int = 0,
@@ -182,7 +184,7 @@ class WeatherDataModule(LightningDataModule):
         self.num_of_features = num_of_additional_features + 1
         self.additional_features = additional_features
         self.boundaries = torch.Tensor(boundaries)
-        self.num_classes = len(self.boundaries) + 1
+        self.num_classes = num_classes
         self.normalize = normalize
 
         self.batch_size = batch_size
