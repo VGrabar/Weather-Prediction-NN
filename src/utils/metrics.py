@@ -6,8 +6,6 @@ from torchmetrics.classification import AUROC, AveragePrecision, F1Score, ROC, A
 def metrics_celled(all_targets, all_preds, n_classes, mode: str = "train"):
     if n_classes > 2:
         acc_table = torch.zeros(all_preds.shape[2], all_preds.shape[3])
-        print(all_preds.shape)
-        print(all_targets.shape)
         acc = Accuracy(
             task="multiclass", num_classes=n_classes, top_k=1, average="micro"
         ).to(torch.device("cuda", 0))

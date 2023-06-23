@@ -267,6 +267,16 @@ class RCNNModule(LightningModule):
         # return most frequent class along history_dim
         x_binned = torch.bucketize(x, self.boundaries)
         most_freq_values, most_freq_indices = torch.mode(x_binned, dim=1)
+        # transform from class to prob
+        if self.num_class > 2:
+            new_most_freq_values = torch.zeros(most_freq_values.shape[0], self.num_class, most_freq_values.shape[1], most_freq_values.shape[2])
+            for b in range(most_freq_values.shape[0]):
+                for h in range(most_freq_values.shape[1]):
+                    for w in range(most_freq_values.shape[2]):
+                        c = most_freq_values[b, h, w]
+                        new_most_freq_values[b, c, h, w] = 100.0 
+            most_freq_values = new_most_freq_values
+            most_freq_values = most_freq_values.to(torch.device('cuda:0'))
         return most_freq_values
 
     def on_after_backward(self) -> None:
@@ -482,6 +492,8 @@ class RCNNModule(LightningModule):
             acc_table, ap_table, f1_table, thr = metrics_celled(
                 all_targets, all_preds, self.num_class, "test"
             )
+            #transform baselines from class to probability 100
+
             (
                 acc_table_baseline,
                 ap_table_baseline,
