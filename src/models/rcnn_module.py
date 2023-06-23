@@ -77,7 +77,8 @@ class RCNNModule(LightningModule):
         # number of bins for pdsi
         self.dropout = torch.nn.Dropout2d(p=dropout)
         self.num_class = num_classes
-        self.boundaries = torch.tensor(boundaries).cuda()
+        #self.boundaries = torch.tensor(boundaries).cuda()
+        self.boundaries = torch.tensor(boundaries)
 
         self.emb_size = embedding_size
         self.hid_size = hidden_state_size
@@ -243,7 +244,8 @@ class RCNNModule(LightningModule):
         x, y = batch
         preds = self.forward(x)
         # atm checking last prediction
-        loss = self.criterion(preds, y[:, -1, :, :])
+        #loss = self.criterion(preds, y[:, -1, :, :])
+        loss = 0
         return loss, preds, y[:, -1, :, :]
 
     def rolling_step(self, batch: Any):
@@ -389,15 +391,15 @@ class RCNNModule(LightningModule):
 
         all_preds = torch.softmax(all_preds, dim=1)
         for k in [10, 20, 30, 40, 50, 60, 70, 80, 90]:
-            new_preds = torch.empty((all_preds.size[0], 3, all_preds.size[2], all_preds.size[3]))
-            new_baselines = torch.empty((all_preds.size[0], 3, all_preds.size[2], all_preds.size[3]))
+            new_preds = torch.empty((all_preds.size()[0], 3, all_preds.size()[2], all_preds.size()[3]))
+            new_baselines = torch.empty((all_preds.size()[0], 3, all_preds.size()[2], all_preds.size()[3]))
             new_preds[:, 2, :, :] = all_preds[:, 1, :, :]
-            new_baselines[:, 2, :, :] = all_baselines[:, 1, :, :]
+            new_baselines[:, 2, :, :] = all_baselines[:, :, :]
             #all_preds = all_preds[:, 1, :, :]
             new_preds[:, 1, :, :] = (1 - k/100) * all_preds[:, 0, :, :]
             new_preds[:, 0, :, :] = (k/100) * all_preds[:, 0, :, :]
-            new_baselines[:, 1, :, :] = (1 - k/100) * all_baselines[:, 0, :, :]
-            new_baselines[:, 0, :, :] = (k/100) * all_baselines[:, 0, :, :]
+            new_baselines[:, 1, :, :] = (1 - k/100) * (1 - all_baselines[:, :, :])
+            new_baselines[:, 0, :, :] = (k/100) * (1 - all_baselines[:, :, :])
 
             self.saved_predictions = new_preds
             self.saved_targets = all_targets
@@ -413,7 +415,7 @@ class RCNNModule(LightningModule):
             ) = metrics_celled(all_targets, new_baselines, "test")
             # log confusion matrix
             #cf_path = make_cf_matrix(all_targets, all_preds, thresholds, "cf_matrix.png")
-            self.logger.experiment[0].log_image(cf_path)
+            #self.logger.experiment[0].log_image(cf_path)
             # log metrics
             if self.mode == "classification":
                 self.log(
