@@ -60,7 +60,7 @@ n_cells_hor: 66
 n_cells_ver: 123
 mode: "classification" # "classification" or "regression"
 num_classes: 2 # for classifier
-boundaries: [-2] # for classifier
+boundaries: [-2, 2] # for classifier
 feature_to_predict: "pdsi"
 num_of_additional_features: 0
 additional_features: [] #["pr", "pet", "tmmn", "tmmx"]
