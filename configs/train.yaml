@@ -56,8 +56,8 @@ test: True
 seed: null
 
 # parameters of the model that are shared with dataloader
-n_cells_hor: 62
-n_cells_ver: 124
+n_cells_hor: 66
+n_cells_ver: 123
 history_length: 6
 periods_forward: 1
 mode: "classification" # "classification" or "regression"
@@ -68,4 +68,4 @@ additional_features: [] #["pr", "pet", "tmmn", "tmmx"]
 
 # default name for the experiment, determines logging folder path
 # (you can overwrite this name in experiment configs)
-name: comparison_${dataset_name}_${model._target_}_history_${history_length}_forward_${periods_forward}
+name: 5class_${dataset_name}_${model._target_}_history_${history_length}_forward_${periods_forward}
