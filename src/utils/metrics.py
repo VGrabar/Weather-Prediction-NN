@@ -19,11 +19,34 @@ def metrics_celled(all_targets, all_preds, n_classes, mode: str = "train"):
             ]
         )
         acc_table = torch.nan_to_num(acc_table, nan=0.0)
-        ap_table = torch.zeros(all_preds.shape[2], all_preds.shape[3])
-        f1_table = torch.zeros(all_preds.shape[2], all_preds.shape[3])
+        rocauc_table_macro = torch.zeros(all_preds.shape[1], all_preds.shape[2])
+        rocauc_table_weighted = torch.zeros(all_preds.shape[1], all_preds.shape[2])
+        if mode == "test":
+            rocauc = AUROC(task="multiclass", num_classes=n_classes, average="macro", thresholds=20)
+            rocauc_table_macro = torch.tensor(
+                [
+                    [
+                        rocauc(all_preds[:, :, x, y], all_targets[:, x, y])
+                        for x in range(all_preds.shape[1])
+                    ]
+                    for y in range(all_preds.shape[2])
+                ]
+            )
+            rocauc = AUROC(task="multiclass", num_classes=n_classes, average="weighted", thresholds=20)
+            rocauc_table_weighted = torch.tensor(
+                [
+                    [
+                        rocauc(all_preds[:, :, x, y], all_targets[:, x, y])
+                        for x in range(all_preds.shape[1])
+                    ]
+                    for y in range(all_preds.shape[2])
+                ]
+            )
+        rocauc_table_macro = torch.nan_to_num(rocauc_table_macro, nan=0.0)
+        rocauc_table_weighted = torch.nan_to_num(rocauc_table_weighted, nan=0.0)
         thresholds = torch.zeros(all_preds.shape[2], all_preds.shape[3])
 
-        return acc_table, ap_table, f1_table, thresholds
+        return acc_table, rocauc_table_macro, rocauc_table_weighted, thresholds
 
     else:
         rocauc_table = torch.zeros(all_preds.shape[1], all_preds.shape[2])

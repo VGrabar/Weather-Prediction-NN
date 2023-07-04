@@ -269,14 +269,19 @@ class RCNNModule(LightningModule):
         most_freq_values, most_freq_indices = torch.mode(x_binned, dim=1)
         # transform from class to prob
         if self.num_class > 2:
-            new_most_freq_values = torch.zeros(most_freq_values.shape[0], self.num_class, most_freq_values.shape[1], most_freq_values.shape[2])
+            new_most_freq_values = torch.zeros(
+                most_freq_values.shape[0],
+                self.num_class,
+                most_freq_values.shape[1],
+                most_freq_values.shape[2],
+            )
             for b in range(most_freq_values.shape[0]):
                 for h in range(most_freq_values.shape[1]):
                     for w in range(most_freq_values.shape[2]):
                         c = most_freq_values[b, h, w]
-                        new_most_freq_values[b, c, h, w] = 100.0 
+                        new_most_freq_values[b, c, h, w] = 100.0
             most_freq_values = new_most_freq_values
-            most_freq_values = most_freq_values.to(torch.device('cuda:0'))
+            most_freq_values = most_freq_values.to(torch.device("cuda:0"))
         return most_freq_values
 
     def on_after_backward(self) -> None:
@@ -328,12 +333,24 @@ class RCNNModule(LightningModule):
                 prog_bar=True,
             )
         elif self.mode == "classification" and self.num_class > 2:
-            acc_table, ap_table, f1_table, thr = metrics_celled(
+            acc_table, rocauc_table_macro, rocauc_table_weighted, thr = metrics_celled(
                 all_targets, all_preds, self.num_class
             )
             self.log(
                 "train/accuracy_median",
                 torch.median(acc_table),
+                on_epoch=True,
+                prog_bar=True,
+            )
+            self.log(
+                "train/rocauc_macro_median",
+                torch.median(rocauc_table_macro),
+                on_epoch=True,
+                prog_bar=True,
+            )
+            self.log(
+                "train/rocauc_weighted_median",
+                torch.median(rocauc_table_weighted),
                 on_epoch=True,
                 prog_bar=True,
             )
@@ -358,7 +375,7 @@ class RCNNModule(LightningModule):
         for i in range(1, len(outputs)):
             all_preds = torch.cat((all_preds, outputs[i]["preds"]), 0)
             all_targets = torch.cat((all_targets, outputs[i]["targets"]), 0)
-        
+
         all_preds = torch.softmax(all_preds, dim=1)
         if self.num_class == 2:
             all_preds = all_preds[:, 1, :, :]
@@ -387,12 +404,24 @@ class RCNNModule(LightningModule):
                 prog_bar=True,
             )
         elif self.mode == "classification" and self.num_class > 2:
-            acc_table, ap_table, f1_table, thr = metrics_celled(
+            acc_table, rocauc_table_macro, rocauc_table_weighted, thr = metrics_celled(
                 all_targets, all_preds, self.num_class
             )
             self.log(
                 "val/accuracy_median",
                 torch.median(acc_table),
+                on_epoch=True,
+                prog_bar=True,
+            )
+            self.log(
+                "val/rocauc_macro_median",
+                torch.median(rocauc_table_macro),
+                on_epoch=True,
+                prog_bar=True,
+            )
+            self.log(
+                "val/rocauc_weighted_median",
+                torch.median(rocauc_table_weighted),
                 on_epoch=True,
                 prog_bar=True,
             )
@@ -489,19 +518,10 @@ class RCNNModule(LightningModule):
             self.logger.experiment[0].log_image(rocauc_path)
 
         elif self.mode == "classification" and self.num_class > 2:
-            acc_table, ap_table, f1_table, thr = metrics_celled(
+            print(all_preds.shape)
+            acc_table, rocauc_table_macro, rocauc_table_weighted, thr = metrics_celled(
                 all_targets, all_preds, self.num_class, "test"
             )
-            #transform baselines from class to probability 100
-
-            (
-                acc_table_baseline,
-                ap_table_baseline,
-                f1_table_baseline,
-                thresholds,
-            ) = metrics_celled(all_targets, all_baselines, self.num_class, "test")
-
-            # log metrics
             self.log(
                 "test/accuracy_median",
                 torch.median(acc_table),
@@ -509,8 +529,41 @@ class RCNNModule(LightningModule):
                 prog_bar=True,
             )
             self.log(
+                "test/rocauc_macro_median",
+                torch.median(rocauc_table_macro),
+                on_epoch=True,
+                prog_bar=True,
+            )
+            self.log(
+                "test/rocauc_weighted_median",
+                torch.median(rocauc_table_weighted),
+                on_epoch=True,
+                prog_bar=True,
+            )
+            # transform baselines from class to probability 100
+            (
+                acc_table_baseline,
+                rocauc_table_macro_baseline,
+                rocauc_table_weighted_baseline,
+                thresholds,
+            ) = metrics_celled(all_targets, all_baselines, self.num_class, "test")
+
+            # log metrics
+            self.log(
                 "test/baseline/accuracy_median",
                 torch.median(acc_table_baseline),
+                on_epoch=True,
+                prog_bar=True,
+            )
+            self.log(
+                "test/baseline/rocauc_macro_median",
+                torch.median(rocauc_table_macro_baseline),
+                on_epoch=True,
+                prog_bar=True,
+            )
+            self.log(
+                "test/baseline/rocauc_weighted_median",
+                torch.median(rocauc_table_weighted_baseline),
                 on_epoch=True,
                 prog_bar=True,
             )
