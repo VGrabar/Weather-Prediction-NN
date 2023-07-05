@@ -36,7 +36,8 @@ def test(config: DictConfig) -> None:
     # Init lightning model
     log.info(f"Instantiating model <{config.model._target_}>")
     model: LightningModule = hydra.utils.instantiate(config.model)
-    model.global_avg = datamodule.global_avg
+    datamodule.setup()
+    model.global_avg = datamodule.data_test.global_avg
 
     # Init lightning loggers
     logger: List[LightningLoggerBase] = []

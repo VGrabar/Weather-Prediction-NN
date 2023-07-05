@@ -54,10 +54,10 @@ class Dataset_RNN(Dataset):
         if self.mode == "classification":
             # positive values are for droughts
             self.target = len(boundaries) - torch.bucketize(self.target, boundaries)
-            if global_avg:
+            if len(global_avg) > 0:
                 self.global_avg = global_avg
             else:
-                self.global_avg = torch.mode(self.target, dim=0)
+                self.global_avg, _ = torch.mode(self.target, dim=0)
         # normalization
         if moments:
             self.moments = moments
@@ -271,6 +271,8 @@ class WeatherDataModule(LightningDataModule):
                 self.transforms,
                 self.mode,
                 self.normalize,
+                [],
+                [],
             )
             # valid_end = int(
             #     (self.train_val_test_split[0] + self.train_val_test_split[1])

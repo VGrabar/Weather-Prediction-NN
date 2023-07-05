@@ -462,10 +462,8 @@ class RCNNModule(LightningModule):
         self.saved_targets = all_targets
 
         #global baseline
-        all_global_baselines = self.global_avg # HxW
-        print(all_global_baselines.shape)
-        all_global_baselines = all_global_baselines.repeat(len(all_targets))
-        print(all_global_baselines.shape)
+        all_global_baselines = self.global_avg 
+        all_global_baselines = all_global_baselines.unsqueeze(0).repeat(len(all_targets),1,1)
 
         if self.mode == "classification" and self.num_class == 2:
             rocauc_table, ap_table, f1_table, thr = metrics_celled(
