@@ -83,7 +83,8 @@ class RCNNModule(LightningModule):
         self.kernel_size = kernel_size
         self.dilation = dilation
         self.groups = groups
-
+        
+        self.global_avg = None
         self.saved_predictions = None
         self.saved_targets = None
 
@@ -460,6 +461,12 @@ class RCNNModule(LightningModule):
         self.saved_predictions = all_preds
         self.saved_targets = all_targets
 
+        #global baseline
+        all_global_baselines = self.global_avg # HxW
+        print(all_global_baselines.shape)
+        all_global_baselines = all_global_baselines.repeat(len(all_targets))
+        print(all_global_baselines.shape)
+
         if self.mode == "classification" and self.num_class == 2:
             rocauc_table, ap_table, f1_table, thr = metrics_celled(
                 all_targets, all_preds, self.num_class, "test"
@@ -470,6 +477,12 @@ class RCNNModule(LightningModule):
                 f1_table_baseline,
                 thresholds,
             ) = metrics_celled(all_targets, all_baselines, self.num_class, "test")
+            (
+                rocauc_table_global,
+                ap_table_global,
+                f1_table_global,
+                thresholds,
+            ) = metrics_celled(all_targets, all_global_baselines, self.num_class, "test")
             # log confusion matrix
             cf_path = make_cf_matrix(
                 all_targets, all_preds, thresholds, "cf_matrix.png"
@@ -512,6 +525,24 @@ class RCNNModule(LightningModule):
                 on_epoch=True,
                 prog_bar=True,
             )
+            self.log(
+                "test/global/f1_median",
+                torch.median(f1_table_global),
+                on_epoch=True,
+                prog_bar=True,
+            )
+            self.log(
+                "test/global/ap_median",
+                torch.median(ap_table_global),
+                on_epoch=True,
+                prog_bar=True,
+            )
+            self.log(
+                "test/global/rocauc_median",
+                torch.median(rocauc_table_global),
+                on_epoch=True,
+                prog_bar=True,
+            )
 
             rocauc_path = make_heatmap(rocauc_table, filename="rocauc_spatial.png")
             torch.save(rocauc_table, "rocauc_table.pt")
@@ -540,14 +571,13 @@ class RCNNModule(LightningModule):
                 on_epoch=True,
                 prog_bar=True,
             )
-            # transform baselines from class to probability 100
+            
             (
                 acc_table_baseline,
                 rocauc_table_macro_baseline,
                 rocauc_table_weighted_baseline,
                 thresholds,
             ) = metrics_celled(all_targets, all_baselines, self.num_class, "test")
-
             # log metrics
             self.log(
                 "test/baseline/accuracy_median",
@@ -564,6 +594,45 @@ class RCNNModule(LightningModule):
             self.log(
                 "test/baseline/rocauc_weighted_median",
                 torch.median(rocauc_table_weighted_baseline),
+                on_epoch=True,
+                prog_bar=True,
+            )
+
+            # transform from value of a class to one-hot vector of probabilities
+            new_all_global_baselines = torch.zeros(
+                all_global_baselines.shape[0],
+                self.num_class,
+                all_global_baselines.shape[1],
+                all_global_baselines.shape[2],
+            )
+            for b in range(all_global_baselines.shape[0]):
+                for h in range(all_global_baselines.shape[1]):
+                    for w in range(all_global_baselines.shape[2]):
+                        c = all_global_baselines[b, h, w]
+                        new_all_global_baselines[b, c, h, w] = 100.0
+            all_global_baselines = new_all_global_baselines
+            all_global_baselines = all_global_baselines.to(torch.device("cuda:0"))
+            (
+                acc_table_global,
+                rocauc_table_macro_global,
+                rocauc_table_weighted_global,
+                thresholds,
+            ) = metrics_celled(all_targets, all_global_baselines, self.num_class, "test")
+            self.log(
+                "test/global/accuracy_median",
+                torch.median(acc_table_global),
+                on_epoch=True,
+                prog_bar=True,
+            )
+            self.log(
+                "test/global/rocauc_macro_median",
+                torch.median(rocauc_table_macro_global),
+                on_epoch=True,
+                prog_bar=True,
+            )
+            self.log(
+                "test/global/rocauc_macro_weighted",
+                torch.median(rocauc_table_weighted_global),
                 on_epoch=True,
                 prog_bar=True,
             )
