@@ -547,7 +547,6 @@ class RCNNModule(LightningModule):
             self.logger.experiment[0].log_image(rocauc_path)
 
         elif self.mode == "classification" and self.num_class > 2:
-            print(all_preds.shape)
             acc_table, rocauc_table_macro, rocauc_table_weighted, thr = metrics_celled(
                 all_targets, all_preds, self.num_class, "test"
             )
@@ -569,7 +568,9 @@ class RCNNModule(LightningModule):
                 on_epoch=True,
                 prog_bar=True,
             )
-            
+            # confusion matrix
+            preds_for_cm = torch.argmax(all_preds, dim=1)
+            self.logger.experiment[0].log_confusion_matrix(torch.flatten(all_targets), torch.flatten(preds_for_cm))
             (
                 acc_table_baseline,
                 rocauc_table_macro_baseline,
