@@ -84,7 +84,8 @@ class RCNNModule(LightningModule):
         self.kernel_size = kernel_size
         self.dilation = dilation
         self.groups = groups
-
+        
+        self.global_avg = None
         self.saved_predictions = None
         self.saved_targets = None
 
@@ -388,10 +389,18 @@ class RCNNModule(LightningModule):
             all_baselines = torch.cat((all_baselines, outputs[i]["baseline"]), 0)
 
         all_preds = torch.softmax(all_preds, dim=1)
+        # log confusion matrix
+        preds_for_cm = torch.argmax(all_preds, dim=1)
+        #self.logger.experiment[0].log_confusion_matrix(torch.flatten(all_targets), torch.flatten(preds_for_cm))
+        # probability of first class
         all_preds = all_preds[:, 1, :, :]
 
         self.saved_predictions = all_preds
         self.saved_targets = all_targets
+        
+        #global baseline
+        all_global_baselines = self.global_avg.to("cuda:0")
+        all_global_baselines = all_global_baselines.unsqueeze(0).repeat(len(all_targets),1,1)
 
         rocauc_table, ap_table, f1_table, thr = metrics_celled(
             all_targets, all_preds, "test"
@@ -402,9 +411,9 @@ class RCNNModule(LightningModule):
             f1_table_baseline,
             thresholds,
         ) = metrics_celled(all_targets, all_baselines, "test")
-        # log confusion matrix
-        cf_path = make_cf_matrix(all_targets, all_preds, thresholds, "cf_matrix.png")
-        self.logger.experiment[0].log_image(cf_path)
+        rocauc_table_global, ap_table_global, f1_table_global, thr = metrics_celled(
+            all_targets, all_global_baselines, "test"
+        )
         # log metrics
         if self.mode == "classification":
             self.log(
@@ -443,6 +452,25 @@ class RCNNModule(LightningModule):
                 on_epoch=True,
                 prog_bar=True,
             )
+            self.log(
+                "test/global/f1_median",
+                torch.median(f1_table_global),
+                on_epoch=True,
+                prog_bar=True,
+            )
+            self.log(
+                "test/global/ap_median",
+                torch.median(ap_table_global),
+                on_epoch=True,
+                prog_bar=True,
+            )
+            self.log(
+                "test/global/rocauc_median",
+                torch.median(rocauc_table_global),
+                on_epoch=True,
+                prog_bar=True,
+            )
+
 
         rocauc_path = make_heatmap(rocauc_table, filename="rocauc_spatial.png")
         torch.save(rocauc_table, "rocauc_table.pt")

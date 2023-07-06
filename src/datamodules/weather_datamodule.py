@@ -33,6 +33,7 @@ class Dataset_RNN(Dataset):
         mode,
         normalize: bool,
         moments: Optional[List[None]],
+        global_avg: Optional[List[None]],
     ):
         # clean up data - remove 1st x and y spatial dims
         self.data = transforms(celled_data[start_date:end_date, 1:, 1:])
@@ -53,6 +54,10 @@ class Dataset_RNN(Dataset):
         if self.mode == "classification":
             # 1 is for drought
             self.target = 1 - torch.bucketize(self.target, self.boundaries)
+            if len(global_avg) > 0:
+                self.global_avg = global_avg
+            else:
+                self.global_avg, _ = torch.mode(self.target, dim=0)
         # normalization
         if moments:
             self.moments = moments
@@ -268,6 +273,7 @@ class WeatherDataModule(LightningDataModule):
                 self.mode,
                 self.normalize,
                 [],
+                [],
             )
             # valid_end = int(
             #     (self.train_val_test_split[0] + self.train_val_test_split[1])
@@ -286,6 +292,7 @@ class WeatherDataModule(LightningDataModule):
                 self.mode,
                 self.normalize,
                 self.data_train.moments,
+                self.data_train.global_avg,
             )
             test_end = celled_data.shape[0]
             self.data_test = Dataset_RNN(
@@ -300,6 +307,7 @@ class WeatherDataModule(LightningDataModule):
                 self.mode,
                 self.normalize,
                 self.data_train.moments,
+                self.data_train.global_avg,
             )
 
     def train_dataloader(self):
