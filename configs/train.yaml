@@ -35,7 +35,7 @@ original_work_dir: ${hydra:runtime.cwd}
 
 # path to folder with data
 data_dir: ${original_work_dir}/data/
-dataset_name: "pdsi_MadhyaPradesh.csv"
+dataset_name: "pdsi_Belarus_with_neighb.csv"
 batch_size: 1
 num_epochs: 80
 
@@ -58,7 +58,7 @@ seed: null
 # parameters of the model that are shared with dataloader
 n_cells_hor: 131
 n_cells_ver: 197
-history_length: 6
+history_length: 9
 periods_forward: 1
 mode: "classification" # "classification" or "regression"
 num_classes: 2 # for classifier

@@ -145,6 +145,7 @@ class WeatherDataModule(LightningDataModule):
         num_of_additional_features: int = 0,
         additional_features: Optional[List[str]] = None,
         boundaries: Optional[List[str]] = None,
+        patch_size: int = 8,
         normalize: bool = False,
         batch_size: int = 64,
         num_workers: int = 0,
@@ -186,6 +187,7 @@ class WeatherDataModule(LightningDataModule):
         self.num_of_features = num_of_additional_features + 1
         self.additional_features = additional_features
         self.boundaries = torch.Tensor(boundaries)
+        self.patch_size = patch_size
         self.normalize = normalize
 
         self.batch_size = batch_size
@@ -239,11 +241,18 @@ class WeatherDataModule(LightningDataModule):
         if not self.data_train and not self.data_val and not self.data_test:
             celled_data_path = pathlib.Path(self.data_dir, "celled", self.dataset_name)
             celled_data = torch.load(celled_data_path)
+            # make borders divisible by patch size
+            h = celled_data.shape[1]
+            h = h - h % self.patch_size
+            w = celled_data.shape[2]
+            w = w - w % self.patch_size
+            celled_data = celled_data[:, :h, :w]
             celled_data = celled_data[
                 self.data_start : self.data_start + self.data_len,
                 self.down_border : self.up_border,
                 self.left_border : self.right_border,
             ]
+            print("data dim", celled_data.shape)
             # loading features
             celled_features_list = []
             data_dir_geo = self.dataset_name.split(self.feature_to_predict)[1]
@@ -252,6 +261,12 @@ class WeatherDataModule(LightningDataModule):
                     self.data_dir, "celled", feature + data_dir_geo
                 )
                 celled_feature = torch.load(celled_feature_path)
+                # make borders divisible by patch size
+                h = celled_feature.shape[1]
+                h = h - h % self.patch_size
+                w = celled_feature.shape[2]
+                w = w - w % self.patch_size
+                celled_feature = celled_feature[:, :h, :w]
                 celled_feature = celled_feature[
                     self.data_start : self.data_start + self.data_len,
                     self.down_border : self.up_border,

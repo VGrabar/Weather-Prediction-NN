@@ -17,11 +17,12 @@ train_val_test_split: [0.7, 0.3, 0.3]
 periods_forward: ${periods_forward}
 history_length: ${history_length}
 data_start: 0
-data_len: 700
+data_len: 1000
 feature_to_predict: ${feature_to_predict}
 num_of_additional_features: ${num_of_additional_features}
 additional_features: ${additional_features}
 boundaries: ${boundaries}
+patch_size: 8
 normalize: True
 batch_size: ${batch_size}
 num_workers: 0
