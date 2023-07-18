@@ -406,7 +406,7 @@ class RCNNModule(LightningModule):
         # all zeros baseline - no drought
         all_zeros = torch.zeros(
             all_preds.shape[0], all_preds.shape[1], all_preds.shape[2]
-        )
+        ).to("cuda:0")
         rocauc_table, ap_table, f1_table, thr = metrics_celled(
             all_targets, all_preds, "test"
         )

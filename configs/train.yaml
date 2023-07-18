@@ -69,4 +69,4 @@ additional_features: [] #["pr", "pet", "tmmn", "tmmx"]
 
 # default name for the experiment, determines logging folder path
 # (you can overwrite this name in experiment configs)
-name: comparison_${dataset_name}_${model._target_}_history_${history_length}_forward_${periods_forward}
+name: newdimensions_${dataset_name}_${model._target_}_history_${history_length}_forward_${periods_forward}
