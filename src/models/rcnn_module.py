@@ -181,6 +181,7 @@ class RCNNModule(LightningModule):
                 dilation=1,
                 groups=1,
             ),
+            nn.Sigmoid(),
         )
 
         self.register_buffer(

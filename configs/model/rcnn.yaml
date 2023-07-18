@@ -6,8 +6,8 @@ hidden_state_size: 32
 kernel_size: 3
 groups: 1
 dilation: 1
-n_cells_hor: ${n_cells_hor}
-n_cells_ver: ${n_cells_ver}
+n_cells_hor: 100
+n_cells_ver: 100
 history_length: ${history_length}
 periods_forward: ${periods_forward}
 batch_size: ${batch_size}

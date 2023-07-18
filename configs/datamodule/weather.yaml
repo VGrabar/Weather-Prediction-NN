@@ -7,8 +7,6 @@ left_border: 0
 down_border: 0
 right_border: 350
 up_border: 350
-n_cells_hor: ${n_cells_hor}
-n_cells_ver: ${n_cells_ver}
 time_col: "date"
 event_col: "val"
 x_col: "x"

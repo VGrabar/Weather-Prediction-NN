@@ -4,9 +4,11 @@ from typing import Optional, Tuple, List
 import torch
 from pytorch_lightning import LightningDataModule
 from torch.utils.data import DataLoader, Dataset
-from torchvision import transforms
 
 from src.utils.data_utils import create_celled_data
+from src import utils
+
+log = utils.get_logger(__name__)
 
 
 class Dataset_RNN(Dataset):
@@ -29,22 +31,16 @@ class Dataset_RNN(Dataset):
         periods_forward: int,
         history_length: int,
         boundaries: Optional[List[None]],
-        transforms,
         mode,
         normalize: bool,
         moments: Optional[List[None]],
         global_avg: Optional[List[None]],
     ):
-        # clean up data - remove 1st x and y spatial dims
-        self.data = transforms(celled_data[start_date:end_date, 1:, 1:])
+        self.data = celled_data[start_date:end_date, :, :]
         self.features = [
-            transforms(feature[start_date:end_date, 1:, 1:])
+            feature[start_date:end_date, :, :]
             for feature in celled_features_list
         ]
-        # self.features = celled_features_list
-        # for i, feature in enumerate(self.features):
-        #    feature = transforms(feature[start_date:end_date, 1:, 1:])
-        #    print(feature.shape)
         self.periods_forward = periods_forward
         self.history_length = history_length
         self.mode = mode
@@ -130,8 +126,6 @@ class WeatherDataModule(LightningDataModule):
         down_border: int = 0,
         right_border: int = 2000,
         up_border: int = 2500,
-        n_cells_hor: int = 100,
-        n_cells_ver: int = 100,
         time_col: str = "time",
         event_col: str = "value",
         x_col: str = "x",
@@ -162,14 +156,8 @@ class WeatherDataModule(LightningDataModule):
         self.right_border = right_border
         self.down_border = down_border
         self.up_border = up_border
-        self.n_cells_hor = n_cells_hor
-        self.n_cells_ver = n_cells_ver
-        self.transforms = transforms.Compose(
-            [
-                transforms.Resize((self.n_cells_hor, self.n_cells_ver)),
-                # transforms.RandomErasing(p=0.25,scale=(0.1, 0.3), ratio=(0.5,2),value=0),
-            ]
-        )
+        self.h = 0
+        self.w = 0
         self.time_col = time_col
         self.event_col = event_col
         self.x_col = x_col
@@ -210,7 +198,7 @@ class WeatherDataModule(LightningDataModule):
                 self.x_col,
                 self.y_col,
             )
-            print(celled_data.shape)
+            log.info(f"Original dataset shape: {celled_data.shape}")
             torch.save(celled_data, celled_data_path)
 
         data_dir_geo = self.dataset_name.split(self.feature_to_predict)[1]
@@ -243,16 +231,15 @@ class WeatherDataModule(LightningDataModule):
             celled_data = torch.load(celled_data_path)
             # make borders divisible by patch size
             h = celled_data.shape[1]
-            h = h - h % self.patch_size
+            self.h = h - h % self.patch_size
             w = celled_data.shape[2]
-            w = w - w % self.patch_size
-            celled_data = celled_data[:, :h, :w]
+            self.w = w - w % self.patch_size
+            celled_data = celled_data[:, :self.h, :self.w]
             celled_data = celled_data[
                 self.data_start : self.data_start + self.data_len,
                 self.down_border : self.up_border,
                 self.left_border : self.right_border,
             ]
-            print("data dim", celled_data.shape)
             # loading features
             celled_features_list = []
             data_dir_geo = self.dataset_name.split(self.feature_to_predict)[1]
@@ -284,7 +271,6 @@ class WeatherDataModule(LightningDataModule):
                 self.periods_forward,
                 self.history_length,
                 self.boundaries,
-                self.transforms,
                 self.mode,
                 self.normalize,
                 [],
@@ -303,7 +289,6 @@ class WeatherDataModule(LightningDataModule):
                 self.periods_forward,
                 self.history_length,
                 self.boundaries,
-                self.transforms,
                 self.mode,
                 self.normalize,
                 self.data_train.moments,
@@ -318,12 +303,14 @@ class WeatherDataModule(LightningDataModule):
                 self.periods_forward,
                 self.history_length,
                 self.boundaries,
-                self.transforms,
                 self.mode,
                 self.normalize,
                 self.data_train.moments,
                 self.data_train.global_avg,
             )
+            log.info(f"train dataset shape {self.data_train.data.shape}")
+            log.info(f"val dataset shape {self.data_val.data.shape}")
+            log.info(f"test dataset shape {self.data_test.data.shape}")
 
     def train_dataloader(self):
         return DataLoader(
