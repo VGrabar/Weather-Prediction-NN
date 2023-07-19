@@ -16,5 +16,5 @@ num_classes: ${num_classes}
 boundaries: ${boundaries}
 values_range: 10
 dropout: 0.0
-lr: 0.003
+lr: 0.05
 weight_decay: 0

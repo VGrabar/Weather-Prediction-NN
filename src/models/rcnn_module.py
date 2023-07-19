@@ -219,7 +219,11 @@ class RCNNModule(LightningModule):
         prev_h = self.prev_state_h
         x = self.dropout(x)
         x_emb = self.embedding(x)
-        x_and_h = torch.cat([prev_h, x_emb], dim=1)
+        if x_emb.shape[0] < self.batch_size:
+            h_to_concat = prev_h[:x_emb.shape[0],:,:,:]
+        else:
+            h_to_concat = prev_h
+        x_and_h = torch.cat([h_to_concat, x_emb], dim=1)
 
         f_i = self.f_t(x_and_h)
         i_i = self.i_t(x_and_h)
@@ -244,7 +248,9 @@ class RCNNModule(LightningModule):
     def step(self, batch: Any):
         x, y = batch
         preds = self.forward(x)
-        # atm checking last prediction
+        if y.shape[0] < self.batch_size:
+            preds = preds[:y.shape[0], :, :, :]
+        # checking last prob == prob(c=1)
         loss = self.criterion(preds, y[:, -1, :, :])
         return loss, preds, y[:, -1, :, :]
 
