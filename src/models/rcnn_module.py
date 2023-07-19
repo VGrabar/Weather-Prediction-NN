@@ -220,15 +220,20 @@ class RCNNModule(LightningModule):
         x = self.dropout(x)
         x_emb = self.embedding(x)
         if x_emb.shape[0] < self.batch_size:
-            h_to_concat = prev_h[:x_emb.shape[0],:,:,:]
-        else:
-            h_to_concat = prev_h
-        x_and_h = torch.cat([h_to_concat, x_emb], dim=1)
+            x_emb = torch.nn.functional.pad(
+                x_emb, pad=(0,0,0,0,0,0,0,self.batch_size - x_emb.shape[0]), value=0
+            )
+        x_and_h = torch.cat([prev_h, x_emb], dim=1)
 
         f_i = self.f_t(x_and_h)
         i_i = self.i_t(x_and_h)
         c_i = self.c_t(x_and_h)
         o_i = self.o_t(x_and_h)
+
+        # print("prev_c", prev_c.shape)
+        # print("f_i", f_i.shape)
+        # print("i_i", i_i.shape)
+        # print("c_i", c_i.shape)
 
         next_c = prev_c * f_i + i_i * c_i
         next_h = torch.tanh(next_c) * o_i
@@ -249,8 +254,10 @@ class RCNNModule(LightningModule):
         x, y = batch
         preds = self.forward(x)
         if y.shape[0] < self.batch_size:
-            preds = preds[:y.shape[0], :, :, :]
-        # checking last prob == prob(c=1)
+            y = torch.nn.functional.pad(
+                y, pad=(0,0,0,0,0,0,0,self.batch_size - y.shape[0]), value=0
+            )
+        # checking last (forward) value of target
         loss = self.criterion(preds, y[:, -1, :, :])
         return loss, preds, y[:, -1, :, :]
 
@@ -394,6 +401,11 @@ class RCNNModule(LightningModule):
             all_preds = torch.cat((all_preds, outputs[i]["preds"]), 0)
             all_targets = torch.cat((all_targets, outputs[i]["targets"]), 0)
             all_baselines = torch.cat((all_baselines, outputs[i]["baseline"]), 0)
+        
+        # remove padded values
+        init_len = all_baselines.shape[0]
+        all_preds = all_preds[:init_len,:,:,:]
+        all_targets = all_targets[:init_len,:,:]
 
         all_preds = torch.softmax(all_preds, dim=1)
         # log confusion matrix
@@ -432,19 +444,19 @@ class RCNNModule(LightningModule):
         # log metrics
         if self.mode == "classification":
             self.log(
-                "test/f1_median",
+                "test/convlstm/f1_median",
                 torch.median(f1_table),
                 on_epoch=True,
                 prog_bar=True,
             )
             self.log(
-                "test/ap_median",
+                "test/convlstm/ap_median",
                 torch.median(ap_table),
                 on_epoch=True,
                 prog_bar=True,
             )
             self.log(
-                "test/rocauc_median",
+                "test/convlstm/rocauc_median",
                 torch.median(rocauc_table),
                 on_epoch=True,
                 prog_bar=True,
