@@ -5,7 +5,7 @@ defaults:
   - _self_
   - datamodule: weather.yaml
   - model: rcnn.yaml
-  - callbacks: null # default.yaml
+  - callbacks: default.yaml
   - logger: comet.yaml # set logger here or use command line (e.g. `python train.py logger=tensorboard`)
   - trainer: default.yaml
   - log_dir: default.yaml
@@ -35,9 +35,9 @@ original_work_dir: ${hydra:runtime.cwd}
 
 # path to folder with data
 data_dir: ${original_work_dir}/data/
-dataset_name: "pdsi_voronezh.csv" # "precip_belgorod_20y_40x91.csv"
+dataset_name: "pdsi_Belarus_with_neighb.csv"
 batch_size: 8
-num_epochs: 120
+num_epochs: 80
 
 # pretty print config at the start of the run using Rich library
 print_config: True
@@ -56,11 +56,15 @@ test: True
 seed: null
 
 # parameters of the model that are shared with dataloader
-n_cells_hor: 40
-n_cells_ver: 80
-history_length: 6
+history_length: 9
 periods_forward: 1
+mode: "classification" # "classification" or "regression"
+num_classes: 2 # for classifier
+boundaries: [-2] # for classifier
+feature_to_predict: "pdsi"
+num_of_additional_features: 0
+additional_features: [] #["pr", "pet", "tmmn", "tmmx"]
 
 # default name for the experiment, determines logging folder path
 # (you can overwrite this name in experiment configs)
-name: ${dataset_name}_${model._target_}_forward${periods_forward}
+name: recalc_newdimensions_${dataset_name}_${model._target_}_history_${history_length}_forward_${periods_forward}

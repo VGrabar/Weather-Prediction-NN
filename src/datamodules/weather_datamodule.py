@@ -1,35 +1,103 @@
 import pathlib
-from typing import Optional, Tuple
+from typing import Optional, Tuple, List
 
 import torch
 from pytorch_lightning import LightningDataModule
 from torch.utils.data import DataLoader, Dataset
-from torchvision import transforms
 
 from src.utils.data_utils import create_celled_data
+from src import utils
+
+log = utils.get_logger(__name__)
 
 
 class Dataset_RNN(Dataset):
-    def __init__(self, celled_data, start_date, end_date, periods_forward, history_length, transforms):
-        self.data = transforms(celled_data[start_date : (end_date - periods_forward)])
-        self.size = self.data.shape[0]
+    """
+    Simple Torch Dataset for many-to-many RNN
+        celled_data: source of data,
+        start_date: start date index,
+        end_date: end date index,
+        periods_forward: number of future periods for a target,
+        history_length: number of past periods for an input,
+        transforms: input data manipulations
+    """
+
+    def __init__(
+        self,
+        celled_data: torch.Tensor,
+        celled_features_list: List[torch.Tensor],
+        start_date: int,
+        end_date: int,
+        periods_forward: int,
+        history_length: int,
+        boundaries: Optional[List[None]],
+        mode,
+        normalize: bool,
+        moments: Optional[List[None]],
+        global_avg: Optional[List[None]],
+    ):
+        self.data = celled_data[start_date:end_date, :, :]
+        self.features = [
+            feature[start_date:end_date, :, :]
+            for feature in celled_features_list
+        ]
         self.periods_forward = periods_forward
         self.history_length = history_length
+        self.mode = mode
+        self.target = self.data
+        # bins for pdsi
+        self.boundaries = boundaries
+        if self.mode == "classification":
+            # 1 is for drought
+            self.target = 1 - torch.bucketize(self.target, self.boundaries)
+            if len(global_avg) > 0:
+                self.global_avg = global_avg
+            else:
+                self.global_avg, _ = torch.mode(self.target, dim=0)
+        # normalization
+        if moments:
+            self.moments = moments
+            if normalize:
+                self.data = (self.data - self.moments[0][0]) / (
+                    self.moments[0][1] - self.moments[0][0]
+                )
+                for i in range(1, len(self.moments)):
+                    self.features[i - 1] = (
+                        self.features[i - 1] - self.moments[i][0]
+                    ) / (self.moments[i][1] - self.moments[i][0])
+        else:
+            self.moments = []
+            if normalize:
+                self.data = (self.data - torch.min(self.data)) / (
+                    torch.max(self.data) - torch.min(self.data)
+                )
+                self.moments.append((torch.min(self.data), torch.max(self.data)))
+                for i in range(len(self.features)):
+                    self.features[i] = (
+                        self.features[i] - torch.min(self.features[i])
+                    ) / (torch.max(self.features[i]) - torch.min(self.features[i]))
+                    self.moments.append(
+                        (torch.min(self.features[i]), torch.max(self.features[i]))
+                    )
 
     def __len__(self):
-        return self.size
+        return len(self.data) - self.periods_forward - self.history_length
 
     def __getitem__(self, idx):
-        if (idx - self.history_length + 1) >= 0:
-            return (
-                self.data[idx - self.history_length + 1 : idx + 1],
-                self.data[idx + self.periods_forward],
+        input_tensor = self.data[idx : idx + self.history_length]
+        for feature in self.features:
+            input_tensor = torch.cat(
+                (input_tensor, feature[idx : idx + self.history_length]), dim=0
             )
-        else:
-            return (
-                self.data[0 : self.history_length],
-                self.data[self.history_length - 1 + self.periods_forward],
-            )
+
+        target = self.target[
+            idx + self.history_length : idx + self.history_length + self.periods_forward
+        ]
+
+        return (
+            input_tensor,
+            target,
+        )
 
 
 class WeatherDataModule(LightningDataModule):
@@ -51,14 +119,13 @@ class WeatherDataModule(LightningDataModule):
 
     def __init__(
         self,
+        mode: str = "regression",
         data_dir: str = "data",
         dataset_name: str = "dataset_name",
         left_border: int = 0,
         down_border: int = 0,
         right_border: int = 2000,
         up_border: int = 2500,
-        n_cells_hor: int = 100,
-        n_cells_ver: int = 100,
         time_col: str = "time",
         event_col: str = "value",
         x_col: str = "x",
@@ -68,6 +135,12 @@ class WeatherDataModule(LightningDataModule):
         history_length: int = 1,
         data_start: int = 0,
         data_len: int = 100,
+        feature_to_predict: str = "pdsi",
+        num_of_additional_features: int = 0,
+        additional_features: Optional[List[str]] = None,
+        boundaries: Optional[List[str]] = None,
+        patch_size: int = 8,
+        normalize: bool = False,
         batch_size: int = 64,
         num_workers: int = 0,
         pin_memory: bool = False,
@@ -76,17 +149,15 @@ class WeatherDataModule(LightningDataModule):
 
         # this line allows to access init params with 'self.hparams' attribute
         self.save_hyperparameters(logger=False)
+        self.mode = mode
         self.data_dir = data_dir
         self.dataset_name = dataset_name
         self.left_border = left_border
         self.right_border = right_border
         self.down_border = down_border
         self.up_border = up_border
-        self.n_cells_hor = n_cells_hor
-        self.n_cells_ver = n_cells_ver
-        self.transforms = transforms.Compose(
-            [transforms.Resize((self.n_cells_hor, self.n_cells_ver))]
-        )
+        self.h = 0
+        self.w = 0
         self.time_col = time_col
         self.event_col = event_col
         self.x_col = x_col
@@ -100,6 +171,12 @@ class WeatherDataModule(LightningDataModule):
         self.history_length = history_length
         self.data_start = data_start
         self.data_len = data_len
+        self.feature_to_predict = feature_to_predict
+        self.num_of_features = num_of_additional_features + 1
+        self.additional_features = additional_features
+        self.boundaries = torch.Tensor(boundaries)
+        self.patch_size = patch_size
+        self.normalize = normalize
 
         self.batch_size = batch_size
         self.num_workers = num_workers
@@ -111,25 +188,34 @@ class WeatherDataModule(LightningDataModule):
         This method is called only from a single GPU.
         Do not use it to assign state (self.x = y).
         """
-        celled_data_path = pathlib.Path(
-            self.data_dir,
-            "celled",
-            self.dataset_name
-        )
+        celled_data_path = pathlib.Path(self.data_dir, "celled", self.dataset_name)
         if not celled_data_path.is_file():
             celled_data = create_celled_data(
                 self.data_dir,
                 self.dataset_name,
-                self.left_border,
-                self.down_border,
-                self.right_border,
-                self.up_border,
                 self.time_col,
                 self.event_col,
                 self.x_col,
                 self.y_col,
             )
+            log.info(f"Original dataset shape: {celled_data.shape}")
             torch.save(celled_data, celled_data_path)
+
+        data_dir_geo = self.dataset_name.split(self.feature_to_predict)[1]
+        for feature in self.additional_features:
+            celled_feature_path = pathlib.Path(
+                self.data_dir, "celled", feature + data_dir_geo
+            )
+            if not celled_feature_path.is_file():
+                celled_feature = create_celled_data(
+                    self.data_dir,
+                    feature + data_dir_geo,
+                    self.time_col,
+                    self.event_col,
+                    self.x_col,
+                    self.y_col,
+                )
+                torch.save(celled_feature, celled_feature_path)
 
     def setup(self, stage: Optional[str] = None):
         """Load data. Set variables: `self.data_train`, `self.data_val`, `self.data_test`.
@@ -141,37 +227,92 @@ class WeatherDataModule(LightningDataModule):
 
         # load datasets only if they're not loaded already
         if not self.data_train and not self.data_val and not self.data_test:
-            celled_data_path = pathlib.Path(
-                self.data_dir,
-                "celled",
-                self.dataset_name
-            )
+            celled_data_path = pathlib.Path(self.data_dir, "celled", self.dataset_name)
             celled_data = torch.load(celled_data_path)
-            celled_data = celled_data[self.data_start : self.data_start + self.data_len]
-            train_start = 0 # self.history_len - 1
+            # make borders divisible by patch size
+            h = celled_data.shape[1]
+            self.h = h - h % self.patch_size
+            w = celled_data.shape[2]
+            self.w = w - w % self.patch_size
+            celled_data = celled_data[:, :self.h, :self.w]
+            celled_data = celled_data[
+                self.data_start : self.data_start + self.data_len,
+                self.down_border : self.up_border,
+                self.left_border : self.right_border,
+            ]
+            # loading features
+            celled_features_list = []
+            data_dir_geo = self.dataset_name.split(self.feature_to_predict)[1]
+            for feature in self.additional_features:
+                celled_feature_path = pathlib.Path(
+                    self.data_dir, "celled", feature + data_dir_geo
+                )
+                celled_feature = torch.load(celled_feature_path)
+                # make borders divisible by patch size
+                h = celled_feature.shape[1]
+                h = h - h % self.patch_size
+                w = celled_feature.shape[2]
+                w = w - w % self.patch_size
+                celled_feature = celled_feature[:, :h, :w]
+                celled_feature = celled_feature[
+                    self.data_start : self.data_start + self.data_len,
+                    self.down_border : self.up_border,
+                    self.left_border : self.right_border,
+                ]
+                celled_features_list.append(celled_feature)
+
+            train_start = 0
             train_end = int(self.train_val_test_split[0] * celled_data.shape[0])
             self.data_train = Dataset_RNN(
                 celled_data,
+                celled_features_list,
                 train_start,
                 train_end,
                 self.periods_forward,
                 self.history_length,
-                self.transforms,
+                self.boundaries,
+                self.mode,
+                self.normalize,
+                [],
+                [],
             )
-            valid_end = int(
-                (self.train_val_test_split[0] + self.train_val_test_split[1])
-                * celled_data.shape[0]
-            )
+            # valid_end = int(
+            #     (self.train_val_test_split[0] + self.train_val_test_split[1])
+            #     * celled_data.shape[0]
+            # )
+            valid_end = celled_data.shape[0]
             self.data_val = Dataset_RNN(
-                celled_data, train_end, valid_end, self.periods_forward, self.history_length, self.transforms
+                celled_data,
+                celled_features_list,
+                train_end - self.history_length,
+                valid_end,
+                self.periods_forward,
+                self.history_length,
+                self.boundaries,
+                self.mode,
+                self.normalize,
+                self.data_train.moments,
+                self.data_train.global_avg,
             )
             test_end = celled_data.shape[0]
             self.data_test = Dataset_RNN(
-                celled_data, valid_end, test_end, self.periods_forward, self.history_length, self.transforms
+                celled_data,
+                celled_features_list,
+                train_end - self.history_length,
+                test_end,
+                self.periods_forward,
+                self.history_length,
+                self.boundaries,
+                self.mode,
+                self.normalize,
+                self.data_train.moments,
+                self.data_train.global_avg,
             )
+            log.info(f"train dataset shape {self.data_train.data.shape}")
+            log.info(f"val dataset shape {self.data_val.data.shape}")
+            log.info(f"test dataset shape {self.data_test.data.shape}")
 
     def train_dataloader(self):
-
         return DataLoader(
             self.data_train,
             batch_size=self.batch_size,

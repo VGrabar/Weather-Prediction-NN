@@ -24,19 +24,37 @@ def main(config: DictConfig):
 
     # Applies optional utilities
     utils.extras(config)
+    all_preds = []
+    os.chdir("/Weather-Prediction-NN")
     # Evaluate model
     chkpts = []
-    os.chdir("/Weather-Prediction-NN")
     path = config.ckpt_folder
-    print(path)
     for ck in Path(path).rglob("*.ckpt"):
         if not "last" in str(ck):
             chkpts.append(ck)
-    
-    print(chkpts)
-    config.ckpt_path = chkpts[-1]
-    
-    return test(config)
+    for c in chkpts:
+        config.ckpt_path = c
+        preds, all_targets = test(config)
+        all_preds.append(preds)
+
+    all_preds = torch.stack((all_preds))
+    all_preds = torch.mean(all_preds, dim=0)
+    rocauc_table, ap_table, f1_table = metrics.metrics_celled(all_targets, all_preds)
+    res_rocauc = torch.median(rocauc_table)
+    res_ap = torch.median(ap_table)
+    res_f1 = torch.median(f1_table)
+    log.info(f"test_ensemble_median_rocauc: {res_rocauc}")
+    log.info(f"test_ensemble_median_ap: {res_ap}")
+    log.info(f"test_ensemble_median_f1: {res_f1}")
+    with open("ens.txt", "a") as f:
+        f.write(config.ckpt_folder + "\n")
+        f.write("median_rocauc: " + str(res_rocauc) + "\n")
+        f.write("\n")
+        f.write("median_ap: " + str(res_ap) + "\n")
+        f.write("\n")
+        f.write("median_f1: " + str(res_f1) + "\n")
+        f.write("\n")
+    return
 
 
 if __name__ == "__main__":

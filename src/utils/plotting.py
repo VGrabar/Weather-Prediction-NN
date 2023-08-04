@@ -6,18 +6,44 @@ import seaborn as sns
 import torch
 from matplotlib.backends.backend_agg import FigureCanvasAgg as FigureCanvas
 from matplotlib.figure import Figure
+from sklearn.metrics import confusion_matrix
 
 
-def make_heatmap(table, filename, size=(8, 6), linewidth=0.5, center=0):
-
-    fig = Figure(figsize=size, frameon=False)
+def make_heatmap(table, filename="rocauc_spatial.png", size=(8, 6)):
+    fig = Figure(figsize=size, frameon=True)
     canvas = FigureCanvas(fig)
     ax = fig.add_subplot(111)
-    ax = sns.heatmap(table, linewidth, center=None)
+    ax = sns.heatmap(table, vmin=0.0, vmax=1.0)
+    ax.set_xticklabels([])
+    ax.set_yticklabels([])
 
     full_path = os.path.expanduser(filename)
     ax.figure.savefig(full_path)
-    
+    ax.cla()
+
+    return full_path
+
+
+def make_cf_matrix(
+    targets, preds, thresholds, filename: str = "cf_matrix.png", size=(8, 6)
+):
+    targets = torch.flatten(targets).cpu().numpy()
+    for x in range(preds.shape[1]):
+        for y in range(preds.shape[2]):
+            preds[:,x,y] = torch.bucketize(preds[:,x,y], torch.Tensor([thresholds[x][y]]).cuda())
+    preds = torch.flatten(preds).cpu().numpy()
+
+    cf_matrix = confusion_matrix(targets, preds)
+    fig = Figure(figsize=size, frameon=True)
+    ax = fig.add_subplot(111)
+    ax = sns.heatmap(
+        cf_matrix / np.sum(cf_matrix), annot=True, fmt=".2%", cmap="Blues", cbar=False
+    )
+
+    full_path = os.path.expanduser(filename)
+    ax.figure.savefig(full_path)
+    ax.cla()
+
     return full_path
 
 
@@ -32,7 +58,6 @@ def make_pred_vs_target_plot(
     ylabel_rotate=0,
     filename="forecasts.png",
 ):
-
     fig = Figure(figsize=size, frameon=False)
     canvas = FigureCanvas(fig)
     ax = fig.add_subplot(111)

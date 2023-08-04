@@ -1,0 +1,10 @@
+_target_: src.models.conv1d_module.Conv1dModule
+
+n_cells_hor: ${n_cells_hor}
+n_cells_ver: ${n_cells_ver}
+history_length: ${history_length}
+periods_forward: ${periods_forward}
+batch_size: ${batch_size}
+lr: 0.003
+weight_decay: 0
+

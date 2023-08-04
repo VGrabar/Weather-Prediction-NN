@@ -32,7 +32,11 @@ def test(config: DictConfig) -> None:
     # Init lightning datamodule
     log.info(f"Instantiating datamodule <{config.datamodule._target_}>")
     datamodule: LightningDataModule = hydra.utils.instantiate(config.datamodule)
-
+    datamodule.setup()
+    config.model.n_cells_hor = datamodule.h
+    config.model.n_cells_ver = datamodule.w 
+    config.model.global_avg = datamodule.data_test.global_avg
+    
     # Init lightning model
     log.info(f"Instantiating model <{config.model._target_}>")
     model: LightningModule = hydra.utils.instantiate(config.model)
@@ -55,3 +59,6 @@ def test(config: DictConfig) -> None:
 
     log.info("Starting testing!")
     trainer.test(model=model, datamodule=datamodule, ckpt_path=config.ckpt_path)
+    
+    return
+    #return model.saved_predictions, model.saved_targets 

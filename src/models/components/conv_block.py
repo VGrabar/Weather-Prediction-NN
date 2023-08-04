@@ -2,7 +2,16 @@ import torch.nn as nn
 
 
 class ConvBlock(nn.Module):
-    def __init__(self, in_channels, out_channels, kernel_size, stride=1, padding=1):
+    def __init__(
+        self,
+        in_channels,
+        out_channels,
+        kernel_size,
+        stride=1,
+        padding=1,
+        dilation=1,
+        groups=1,
+    ):
         super(ConvBlock, self).__init__()
 
         self.CONV = nn.Conv2d(
@@ -11,6 +20,8 @@ class ConvBlock(nn.Module):
             kernel_size=kernel_size,
             stride=stride,
             padding=padding,
+            dilation=dilation,
+            groups=groups,
             bias=False,
         )
 
@@ -19,7 +30,6 @@ class ConvBlock(nn.Module):
         self.MAXPOOL = nn.MaxPool2d(3, stride=1, padding=1, dilation=1)
 
     def forward(self, x):
-
         x = self.CONV(x)
         x = self.BNORM(x)
         x = self.MAXPOOL(x)

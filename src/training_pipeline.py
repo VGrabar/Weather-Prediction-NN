@@ -39,14 +39,18 @@ def train(config: DictConfig) -> Optional[float]:
             hydra.utils.get_original_cwd(), ckpt_path
         )
 
-    # Init lightning model
-    log.info(f"Instantiating model <{config.model._target_}>")
-    model: LightningModule = hydra.utils.instantiate(config.model)
 
     # Init lightning datamodule
     log.info(f"Instantiating datamodule <{config.datamodule._target_}>")
     datamodule: LightningDataModule = hydra.utils.instantiate(config.datamodule)
+    datamodule.setup()
+    config.model.n_cells_hor = datamodule.h
+    config.model.n_cells_ver = datamodule.w 
 
+    # Init lightning model
+    log.info(f"Instantiating model <{config.model._target_}>")
+    model: LightningModule = hydra.utils.instantiate(config.model)
+    
     # Init lightning callbacks
     callbacks: List[Callback] = []
     if "callbacks" in config:
@@ -100,6 +104,7 @@ def train(config: DictConfig) -> Optional[float]:
         if not config.get("train") or config.trainer.get("fast_dev_run"):
             ckpt_path = None
         log.info("Starting testing!")
+        model.global_avg = datamodule.data_test.global_avg
         trainer.test(model=model, datamodule=datamodule, ckpt_path=ckpt_path)
 
     # Make sure everything closed properly
