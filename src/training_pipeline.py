@@ -39,13 +39,18 @@ def train(config: DictConfig) -> Optional[float]:
             hydra.utils.get_original_cwd(), ckpt_path
         )
 
-    # Init lightning model
-    log.info(f"Instantiating model <{config.model._target_}>")
-    model: LightningModule = hydra.utils.instantiate(config.model)
 
     # Init lightning datamodule
     log.info(f"Instantiating datamodule <{config.datamodule._target_}>")
     datamodule: LightningDataModule = hydra.utils.instantiate(config.datamodule)
+    datamodule.setup()
+    config.model.n_cells_hor = datamodule.h
+    config.model.n_cells_ver = datamodule.w 
+
+    # Init lightning model
+    log.info(f"Instantiating model <{config.model._target_}>")
+    model: LightningModule = hydra.utils.instantiate(config.model)
+
 
     # Init lightning callbacks
     callbacks: List[Callback] = []

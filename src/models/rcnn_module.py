@@ -52,6 +52,7 @@ class RCNNModule(LightningModule):
         batch_size: int = 1,
         num_of_additional_features: int = 0,
         boundaries: List[int] = [-2],
+        num_classes: int = 2,
         values_range: int = 10,
         dropout: float = 0.0,
         lr: float = 0.003,
@@ -75,7 +76,7 @@ class RCNNModule(LightningModule):
         self.tanh_coef = values_range
         # number of bins for pdsi
         self.dropout = torch.nn.Dropout2d(p=dropout)
-        self.num_class = len(boundaries) + 1
+        self.num_class = num_classes
         self.boundaries = torch.tensor(boundaries).cuda()
 
         self.emb_size = embedding_size
@@ -180,6 +181,7 @@ class RCNNModule(LightningModule):
                 dilation=1,
                 groups=1,
             ),
+            nn.Sigmoid(),
         )
 
         self.register_buffer(
@@ -217,6 +219,10 @@ class RCNNModule(LightningModule):
         prev_h = self.prev_state_h
         x = self.dropout(x)
         x_emb = self.embedding(x)
+        if x_emb.shape[0] < self.batch_size:
+            x_emb = torch.nn.functional.pad(
+                x_emb, pad=(0,0,0,0,0,0,0,self.batch_size - x_emb.shape[0]), value=0
+            )
         x_and_h = torch.cat([prev_h, x_emb], dim=1)
 
         f_i = self.f_t(x_and_h)
@@ -243,6 +249,10 @@ class RCNNModule(LightningModule):
         x, y = batch
         preds = self.forward(x)
         # atm checking last prediction
+        if y.shape[0] < self.batch_size:
+            y = torch.nn.functional.pad(
+                y, pad=(0,0,0,0,0,0,0,self.batch_size - y.shape[0]), value=0
+            )
         loss = self.criterion(preds, y[:, -1, :, :])
         return loss, preds, y[:, -1, :, :]
 
@@ -338,19 +348,19 @@ class RCNNModule(LightningModule):
                 all_targets, all_preds, self.num_class
             )
             self.log(
-                "train/accuracy_median",
+                "train/convlstm/accuracy_median",
                 torch.median(acc_table),
                 on_epoch=True,
                 prog_bar=True,
             )
             self.log(
-                "train/rocauc_macro_median",
+                "train/convlstm/rocauc_macro_median",
                 torch.median(rocauc_table_macro),
                 on_epoch=True,
                 prog_bar=True,
             )
             self.log(
-                "train/rocauc_weighted_median",
+                "train/convlstm/rocauc_weighted_median",
                 torch.median(rocauc_table_weighted),
                 on_epoch=True,
                 prog_bar=True,
@@ -387,19 +397,19 @@ class RCNNModule(LightningModule):
                 all_targets, all_preds, self.num_class
             )
             self.log(
-                "val/f1_median",
+                "val/convlstm/f1_median",
                 torch.median(f1_table),
                 on_epoch=True,
                 prog_bar=True,
             )
             self.log(
-                "val/ap_median",
+                "val/convlstm/ap_median",
                 torch.median(ap_table),
                 on_epoch=True,
                 prog_bar=True,
             )
             self.log(
-                "val/rocauc_median",
+                "val/convlstm/rocauc_median",
                 torch.median(rocauc_table),
                 on_epoch=True,
                 prog_bar=True,
@@ -409,19 +419,19 @@ class RCNNModule(LightningModule):
                 all_targets, all_preds, self.num_class
             )
             self.log(
-                "val/accuracy_median",
+                "val/convlstm/accuracy_median",
                 torch.median(acc_table),
                 on_epoch=True,
                 prog_bar=True,
             )
             self.log(
-                "val/rocauc_macro_median",
+                "val/convlstm/rocauc_macro_median",
                 torch.median(rocauc_table_macro),
                 on_epoch=True,
                 prog_bar=True,
             )
             self.log(
-                "val/rocauc_weighted_median",
+                "val/convlstm/rocauc_weighted_median",
                 torch.median(rocauc_table_weighted),
                 on_epoch=True,
                 prog_bar=True,
@@ -453,6 +463,11 @@ class RCNNModule(LightningModule):
             all_preds = torch.cat((all_preds, outputs[i]["preds"]), 0)
             all_targets = torch.cat((all_targets, outputs[i]["targets"]), 0)
             all_baselines = torch.cat((all_baselines, outputs[i]["baseline"]), 0)
+
+        # remove padded values
+        init_len = all_baselines.shape[0]
+        all_preds = all_preds[:init_len,:,:,:]
+        all_targets = all_targets[:init_len,:,:]
 
         all_preds = torch.softmax(all_preds, dim=1)
         if self.num_class == 2:
@@ -551,26 +566,26 @@ class RCNNModule(LightningModule):
                 all_targets, all_preds, self.num_class, "test"
             )
             self.log(
-                "test/accuracy_median",
+                "test/convlstm/accuracy_median",
                 torch.median(acc_table),
                 on_epoch=True,
                 prog_bar=True,
             )
             self.log(
-                "test/rocauc_macro_median",
+                "test/convlstm/rocauc_macro_median",
                 torch.median(rocauc_table_macro),
                 on_epoch=True,
                 prog_bar=True,
             )
             self.log(
-                "test/rocauc_weighted_median",
+                "test/convlstm/rocauc_weighted_median",
                 torch.median(rocauc_table_weighted),
                 on_epoch=True,
                 prog_bar=True,
             )
             # confusion matrix
-            preds_for_cm = torch.argmax(all_preds, dim=1)
-            self.logger.experiment[0].log_confusion_matrix(torch.flatten(all_targets), torch.flatten(preds_for_cm))
+            #preds_for_cm = torch.argmax(all_preds, dim=1)
+            #self.logger.experiment[0].log_confusion_matrix(torch.flatten(all_targets), torch.flatten(preds_for_cm))
             (
                 acc_table_baseline,
                 rocauc_table_macro_baseline,

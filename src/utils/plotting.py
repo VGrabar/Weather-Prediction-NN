@@ -9,7 +9,7 @@ from matplotlib.figure import Figure
 from sklearn.metrics import confusion_matrix
 
 
-def make_heatmap(table, filename="rocauc_spatial.png", size=(8, 6)):
+def make_heatmap(table, filename="rocauc_spatial.eps", size=(8, 6)):
     fig = Figure(figsize=size, frameon=True)
     canvas = FigureCanvas(fig)
     ax = fig.add_subplot(111)
@@ -18,7 +18,7 @@ def make_heatmap(table, filename="rocauc_spatial.png", size=(8, 6)):
     ax.set_yticklabels([])
 
     full_path = os.path.expanduser(filename)
-    ax.figure.savefig(full_path)
+    ax.figure.savefig(full_path, format="eps", dpi=600)
     ax.cla()
 
     return full_path
