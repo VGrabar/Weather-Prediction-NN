@@ -6,6 +6,7 @@ from pytorch_lightning import LightningDataModule
 from torch.utils.data import DataLoader, Dataset
 
 from src.utils.data_utils import create_celled_data
+from src import utils
 
 log = utils.get_logger(__name__)
 

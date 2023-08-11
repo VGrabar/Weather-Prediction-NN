@@ -36,8 +36,8 @@ original_work_dir: ${hydra:runtime.cwd}
 # path to folder with data
 data_dir: ${original_work_dir}/data/
 dataset_name: "pdsi_Missouri.csv"
-batch_size: 1
-num_epochs: 1
+batch_size: 8
+num_epochs: 2
 
 # pretty print config at the start of the run using Rich library
 print_config: True
@@ -67,4 +67,4 @@ additional_features: [] #["pr", "pet", "tmmn", "tmmx"]
 
 # default name for the experiment, determines logging folder path
 # (you can overwrite this name in experiment configs)
-name: debug_3class_${dataset_name}_${model._target_}_history_${history_length}_forward_${periods_forward}
+name: debug_multiclass_${dataset_name}_${model._target_}_history_${history_length}_forward_${periods_forward}
