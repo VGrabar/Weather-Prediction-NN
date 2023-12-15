@@ -72,5 +72,5 @@ periods_forward: 1
 name: GlobalBaseline_${dataset_name}_${model._target_}_history_${history_length}_forward_${periods_forward}
 
 # checkpoints
-ckpt_folder: logs/experiments/runs/comparison_${dataset_name}_${model._target_}_history_${history_length}_forward_${periods_forward}
+ckpt_folder: logs/experiments/runs/recalc_newdimensions_${dataset_name}_${model._target_}_history_${history_length}_forward_${periods_forward}
 ckpt_path: null

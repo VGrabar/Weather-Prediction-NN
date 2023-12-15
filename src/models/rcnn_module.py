@@ -308,7 +308,7 @@ class RCNNModule(LightningModule):
             all_targets = torch.cat((all_targets, outputs[i]["targets"]), 0)
         all_preds = torch.softmax(all_preds, dim=1)
         all_preds = all_preds[:, 1, :, :]
-        rocauc_table, ap_table, f1_table, thr = metrics_celled(all_targets, all_preds)
+        rocauc_table, ap_table, f1_table, acc_table, thr = metrics_celled(all_targets, all_preds)
         # log metrics
         if self.mode == "classification":
             self.log(
@@ -326,6 +326,12 @@ class RCNNModule(LightningModule):
             self.log(
                 "train/rocauc_median",
                 torch.median(rocauc_table),
+                on_epoch=True,
+                prog_bar=True,
+            )
+            self.log(
+                "train/accuracy_median",
+                torch.median(acc_table),
                 on_epoch=True,
                 prog_bar=True,
             )
@@ -353,7 +359,7 @@ class RCNNModule(LightningModule):
 
         all_preds = torch.softmax(all_preds, dim=1)
         all_preds = all_preds[:, 1, :, :]
-        rocauc_table, ap_table, f1_table, thr = metrics_celled(all_targets, all_preds)
+        rocauc_table, ap_table, f1_table, acc_table, thr = metrics_celled(all_targets, all_preds)
         # log metrics
         if self.mode == "classification":
             self.log(
@@ -374,6 +380,13 @@ class RCNNModule(LightningModule):
                 on_epoch=True,
                 prog_bar=True,
             )
+            self.log(
+                "val/accuracy_median",
+                torch.median(acc_table),
+                on_epoch=True,
+                prog_bar=True,
+            )
+
 
         # log metrics
         # r2table = rsquared(all_targets, all_preds, mode="mean")
@@ -422,24 +435,21 @@ class RCNNModule(LightningModule):
         all_global_baselines = all_global_baselines.unsqueeze(0).repeat(
             len(all_targets), 1, 1
         )
+        all_global_baselines = torch.where(all_global_baselines > 0,100.0, 0.0)
+        all_global_baselines = all_global_baselines.double()
         # all zeros baseline - no drought
         all_zeros = torch.zeros(
-            all_preds.shape[0], all_preds.shape[1], all_preds.shape[2]
+            all_preds.shape[0], all_preds.shape[1], all_preds.shape[2], dtype=torch.long,
         ).to("cuda:0")
-        rocauc_table, ap_table, f1_table, thr = metrics_celled(
-            all_targets, all_preds, "test"
+        all_zeros = all_zeros.double()
+        rocauc_table_zeros, ap_table_zeros, f1_table_zeros, acc_table_zeros, thr = metrics_celled(
+            all_targets, all_zeros, "test"
         )
-        (
-            rocauc_table_baseline,
-            ap_table_baseline,
-            f1_table_baseline,
-            thresholds,
-        ) = metrics_celled(all_targets, all_baselines, "test")
-        rocauc_table_global, ap_table_global, f1_table_global, thr = metrics_celled(
+        rocauc_table_global, ap_table_global, f1_table_global, acc_table_global, thr = metrics_celled(
             all_targets, all_global_baselines, "test"
         )
-        rocauc_table_zeros, ap_table_zeros, f1_table_zeros, thr = metrics_celled(
-            all_targets, all_zeros, "test"
+        rocauc_table, ap_table, f1_table, acc_table, thr = metrics_celled(
+            all_targets, all_preds, "test"
         )
         # log metrics
         if self.mode == "classification":
@@ -462,20 +472,8 @@ class RCNNModule(LightningModule):
                 prog_bar=True,
             )
             self.log(
-                "test/baseline/f1_median",
-                torch.median(f1_table_baseline),
-                on_epoch=True,
-                prog_bar=True,
-            )
-            self.log(
-                "test/baseline/ap_median",
-                torch.median(ap_table_baseline),
-                on_epoch=True,
-                prog_bar=True,
-            )
-            self.log(
-                "test/baseline/rocauc_median",
-                torch.median(rocauc_table_baseline),
+                "test/convlstm/accuracy_median",
+                torch.median(acc_table),
                 on_epoch=True,
                 prog_bar=True,
             )
@@ -498,6 +496,12 @@ class RCNNModule(LightningModule):
                 prog_bar=True,
             )
             self.log(
+                "test/global/accuracy_median",
+                torch.median(acc_table_global),
+                on_epoch=True,
+                prog_bar=True,
+            )
+            self.log(
                 "test/zeros/f1_median",
                 torch.median(f1_table_zeros),
                 on_epoch=True,
@@ -512,6 +516,12 @@ class RCNNModule(LightningModule):
             self.log(
                 "test/zeros/rocauc_median",
                 torch.median(rocauc_table_zeros),
+                on_epoch=True,
+                prog_bar=True,
+            )
+            self.log(
+                "test/zeros/accuracy_median",
+                torch.median(acc_table_zeros),
                 on_epoch=True,
                 prog_bar=True,
             )
